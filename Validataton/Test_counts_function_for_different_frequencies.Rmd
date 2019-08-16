@@ -1,0 +1,35 @@
+---
+title: "Test_counts_function_for_different_frequencies"
+author: "Javad Khataei"
+date: "7/30/2019"
+output:
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+As a part of data preparation process, we need to investigate if have a freq of 30  and a repeated copy of that dataset, which has a pseudo frequency of 90Hz, are actually producing the same counts.
+
+```{r message=FALSE, warning=FALSE}
+library(activityCounts)
+library(magrittr)
+library(tidyverse)
+library(kableExtra)
+df_100_hz <- sampleXYZ
+df_300_hz <- df_100_hz[rep(1:nrow(df_100_hz) , each = 3), ]
+
+c_100 <- df_100_hz %>% counts(hertz = 100)
+c_300 <- df_300_hz %>% counts(hertz = 300)
+
+
+plot(x = c_100$x, y = c_300$x)
+kable(x = head(c_100),caption = "100 Hz") %>% 
+  kable_styling(full_width = T)
+kable(x = head(c_300),caption = "300 Hz") %>% 
+  kable_styling(full_width = T)
+
+```
+After checking the results it seems that changing the frequency by repeating each observation does not affect Counts.

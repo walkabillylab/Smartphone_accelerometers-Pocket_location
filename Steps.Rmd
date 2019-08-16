@@ -1,0 +1,41 @@
+---
+title: "How to prepare Ethica Data for Paper one"
+author: "Javad Khataei"
+date: "02/16/2019"
+output:
+  html_document:
+    code_folding: hide
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
+```
+
+#### This file explaines the data cleaning and extracting process. The steps that we need to take to prepare the data are: ####
+
+
+## Steps:
+
+1. Extract data for each participant:
+    1. Read the list of participants and their start and end time
+    2. Adjust the time of the raw data
+    3. Slice the raw data for each participant based on their time
+    4. Change the frequency to 10 Hz.
+After this step, each participant has three CSV files. However, there are some missing timesteps.
+
+2. Impute and combine. Use a loop and for each participant to:
+    1. Create an empty dataset with a frequency of 10 Hz 
+    2. Join this empty dataset with data from the previous step
+    3. Impute the missing timesteps with linear interpolation
+    4. merge the data with the previous participant
+After this step, we have a comprehensive dataset that has the accelerometer data for all participants.
+3. Merge with the Jaeger data
+    1. Join the data and select only the activity column from the Jaeger
+    2. Trim the activity column and store in trimmed_activity
+    3. Impute the labels (trimmed_activity) by the "fill" method
+    4. Save the data into "Ethica_jaeger_merged.csv" file
+
+4. Add metadata
+    1. Read the metadata from the "Smart_AccelStudy_Participant Register & O2 calculator - Register.csv" file
+    2. merge the data with the "Ethica_jaeger_merged.csv" file

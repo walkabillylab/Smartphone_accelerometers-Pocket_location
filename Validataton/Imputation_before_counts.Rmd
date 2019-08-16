@@ -1,0 +1,882 @@
+---
+title: "Different imputation methods before count"
+author: "Javad Khataei"
+date: "7/22/2019"
+output:
+   html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = T,
+	message = FALSE,
+	warning = FALSE
+)
+#import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(activityCounts)
+library(magrittr)
+library(scales)
+library(imputeTS) # for most Imputations
+library(stats)
+library(VIM) # for KNN
+library(yaImpute) # for KNN , didn't work
+library(DMwR)
+library(imputeR) # for logestic imputation
+
+
+
+
+```
+
+
+As Ethica data has many missing observations, applying the Counts function without imputation gives us a graph which cannot cover all the study length. The solid line at the end the plot shows this issue. Due to the mentioned NAs, this plot is squeezed. I used several methods to impute the missing values, and it seems that the suggested special imputation method produces the best result.
+
+
+Here you can see the effect of using different imputation methods before Counts calculation.
+
+
+## Without Impulation:
+
+```{r include=T}
+
+
+# read the data
+
+working_df <- fread("Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica/142/142_pock.csv")
+working_df$record_time %<>% as_datetime()
+
+# plot raw data
+working_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x_axis )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Raw accel data")
+
+# Repeat the data three times for each timestep to increase frequency
+working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+start_time <- working_df$record_time %>%  first() %>%  as_datetime()
+
+# Accel is not in g
+working_df$x_axis  <- working_df$x_axis / 9.8
+working_df$y_axis  <- working_df$y_axis / 9.8
+working_df$x_axis  <- working_df$z_axis / 9.8
+
+
+# Calculate counts
+counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
+colnames(counts)[1] <- "record_time"
+
+
+#Join with the raw data and impute 
+working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+
+
+# delete transit
+#working_df  %<>% filter(trimmed_activity != "transit")
+
+final_df <- working_df
+
+final_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Counts for X axis")
+
+
+
+```
+
+
+## Special method
+In this method, a period before and after each NA value is extracted and then k samples from this interval are retrieved, and  their average value is used for imputation.
+```{r}
+## Define the function
+imputer_accel <-
+  function(data  ,
+           method = "same",
+           time_period_length = 20 ,
+           k = 10) {
+    set.seed(1000)
+    
+    # convert to second
+    time_per_len <- seconds(x = time_period_length)
+    
+    # create a copy
+    main_df <- data
+    
+    # obtain the NA indices
+    na_index <- main_df$x_axis %>% is.na() %>%  which()
+    
+    
+    if (method == "separate") {
+      for (i in na_index) {
+        # filter the date based on the given time window
+        lower_time <- main_df$record_time[i] - time_per_len
+        upper_time <- main_df$record_time[i] + time_per_len
+        working_df <-
+          data %>%  filter(record_time < upper_time &
+                                record_time > lower_time)
+        
+        # select k observation and calculate their average
+        main_df$x_axis[i] <- working_df$x_axis %>%
+          data.frame %>%
+          sample_n(., k , replace = F)  %>%
+          as.matrix() %>%
+          mean(na.rm = T)
+        
+        main_df$y_axis[i] <- working_df$y_axis %>%
+          data.frame %>%
+          sample_n(., k , replace = F)  %>%
+          as.matrix() %>%
+          mean(na.rm = T)
+        
+        main_df$z_axis[i] <- working_df$z_axis %>%
+          data.frame %>%
+          sample_n(., k , replace = F)  %>%
+          as.matrix() %>%
+          mean(na.rm = T)
+        main_df$participant_id[i]  <- working_df$participant_id %>%
+          mean(na.rm = T)
+        
+        other_columns <- working_df %>%  select(-c(record_time, x_axis, y_axis , z_axis , participant_id)) %>% 
+          colnames()
+        # fill the nonnumerical values
+        main_df %<>%  fill(other_columns) 
+      }
+      
+    } else if (method == "same") {
+      # use the same sample for x,y and z axis
+      
+      for (i in na_index) {
+        lower_time <- main_df$record_time[i] - time_per_len
+        upper_time <- main_df$record_time[i] + time_per_len
+        working_df <-
+          data %>%  filter(record_time < upper_time &
+                                record_time > lower_time) %>% 
+          na.omit()
+        
+        working_df %<>%
+          data.frame %>%
+          sample_n(., k , replace = F)
+        
+        main_df$x_axis[i] <- working_df$x_axis %>%
+          mean(na.rm = T)
+        
+        main_df$y_axis[i] <- working_df$y_axis %>%
+          mean(na.rm = T)
+        
+        main_df$z_axis[i] <- working_df$z_axis %>%
+          mean(na.rm = T)
+        
+        main_df$participant_id[i]  <- working_df$participant_id %>%
+          mean(na.rm = T)
+        
+        other_columns <- working_df %>%  select(-c(record_time, x_axis, y_axis , z_axis , participant_id)) %>% 
+          colnames()
+        # fill the nonnumerical values
+        main_df %<>%  fill(other_columns)
+      }
+      
+    }
+    return(main_df)
+  }
+
+
+
+## --------- Prepare the data
+
+working_df <- fread("Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica/142/142_pock.csv")
+working_df$record_time %<>% as_datetime()
+
+
+longer_df <-
+  seq(
+    first(working_df$record_time),
+    last(working_df$record_time),
+    by = period(num = 0.1, units = "second")
+  ) %>%  as.data.frame()
+colnames(longer_df) <- "record_time"
+
+# Join the datasets
+working_df <-
+  full_join(longer_df, working_df , by = "record_time")
+
+
+# impute NAs 
+working_df <- working_df %>%
+  imputer_accel(time_period_length = 50 , k = 1)
+
+# plot raw data
+working_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x_axis )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Raw accel data")
+
+
+# Repeat the data three times for each timestep
+working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+start_time <- working_df$record_time %>%  first() %>%  as_datetime()
+
+
+# Calculate counts
+counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
+colnames(counts)[1] <- "record_time"
+
+working_df$record_time  %<>% as_datetime()
+
+#Join with the raw data and impute 
+working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+
+
+# delete transit
+#working_df  %<>% filter(trimmed_activity != "transit")
+
+final_df <- working_df
+
+final_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Counts for X axis")
+
+
+
+
+```
+
+
+
+
+## logistic regression with lasso for imputation
+The imputeR package is used.
+
+```{r include=T}
+
+
+working_df <- fread("Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica/142/142_pock.csv")
+working_df$record_time %<>% as_datetime()
+
+
+longer_df <-
+  seq(
+    first(working_df$record_time),
+    last(working_df$record_time),
+    by = period(num = 0.1, units = "second")
+  ) %>%  as.data.frame()
+colnames(longer_df) <- "record_time"
+
+# Join the datasets
+working_df <-
+  full_join(longer_df, working_df , by = "record_time")
+
+
+# impute NAs by linear intrapolation
+# na.interapolation  only works with numeric data
+
+time_column <- working_df$record_time %>% as.data.frame() 
+colnames(time_column) <- "record_time"
+
+
+working_df <- working_df %>%
+  select(c(-wear_location , - record_time)) %>%  
+  impute(.,lmFun = "lassoR" , cFun =  "lassoC" , maxiter =  10 , conv =  F)
+
+working_df  %<>% bind_cols(.,time_column)
+
+# plot raw data
+working_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x_axis )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Raw accel data")
+
+
+# Repeat the data three times for each timestep
+working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+start_time <- working_df$record_time %>%  first() %>%  as_datetime()
+
+
+# Calculate counts
+counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
+colnames(counts)[1] <- "record_time"
+
+working_df$record_time  %<>% as_datetime()
+
+#Join with the raw data and impute 
+working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+
+
+# delete transit
+#working_df  %<>% filter(trimmed_activity != "transit")
+
+final_df <- working_df
+
+final_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Counts for X axis")
+
+
+
+
+```
+
+
+
+
+
+## KNN
+with VIM is very slow.
+
+```{r include=T}
+
+
+working_df <- fread("Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica/142/142_pock.csv")
+working_df$record_time %<>% as_datetime()
+
+
+longer_df <-
+  seq(
+    first(working_df$record_time),
+    last(working_df$record_time),
+    by = period(num = 0.1, units = "second")
+  ) %>%  as.data.frame()
+colnames(longer_df) <- "record_time"
+
+# Join the datasets
+working_df <-
+  full_join(longer_df, working_df , by = "record_time")
+
+
+# impute NAs by linear intrapolation
+# na.interapolation  only works with numeric data
+working_df <- working_df %>%
+  select(-wear_location)  %>% 
+  VIM::kNN()
+
+
+# plot raw data
+working_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x_axis )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Raw accel data")
+
+
+
+# Repeat the data three times for each timestep
+working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+start_time <- working_df$record_time %>%  first() %>%  as_datetime()
+
+
+
+
+
+# Calculate counts
+counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
+colnames(counts)[1] <- "record_time"
+
+
+#Join with the raw data and impute 
+working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+
+
+# delete transit
+#working_df  %<>% filter(trimmed_activity != "transit")
+
+final_df <- working_df
+
+final_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15))  +
+  ggtitle("Counts for X axis")
+
+
+
+
+```
+
+
+
+## KNN with DMwR package
+
+
+```{r include=T}
+
+
+working_df <- fread("Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica/142/142_pock.csv")
+working_df$record_time %<>% as_datetime()
+
+
+longer_df <-
+  seq(
+    first(working_df$record_time),
+    last(working_df$record_time),
+    by = period(num = 0.1, units = "second")
+  ) %>%  as.data.frame()
+colnames(longer_df) <- "record_time"
+
+# Join the datasets
+working_df <-
+  full_join(longer_df, working_df , by = "record_time")
+
+
+# impute NAs by linear intrapolation
+# na.interapolation  only works with numeric data
+
+time_column <- working_df$record_time %>% as.data.frame() 
+colnames(time_column) <- "record_time"
+
+
+working_df <- working_df %>%
+  select(c(-wear_location , - record_time)) %>%  
+   DMwR::knnImputation(scale = F, meth = "median",k = 100)
+
+working_df  %<>% bind_cols(.,time_column)
+
+
+
+# Repeat the data three times for each timestep
+working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+start_time <- working_df$record_time %>%  first() %>%  as_datetime()
+
+
+# Calculate counts
+counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
+colnames(counts)[1] <- "record_time"
+
+
+#Join with the raw data and impute 
+working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+
+
+# delete transit
+#working_df  %<>% filter(trimmed_activity != "transit")
+
+final_df <- working_df
+
+final_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Counts for X axis")
+
+
+
+```
+
+
+
+## Seasonally Decomposed Missing Value Imputation
+
+Removes the seasonal component from the time series, performs imputation on the deseasonalized series and afterwards adds the seasonal component again.
+
+```{r include=F}
+
+
+
+
+
+
+working_df <- fread("Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica/142/142_pock.csv")
+working_df$record_time %<>% as_datetime()
+
+
+
+
+longer_df <-
+  seq(
+    first(working_df$record_time),
+    last(working_df$record_time),
+    by = period(num = 0.1, units = "second")
+  ) %>%  as.data.frame()
+colnames(longer_df) <- "record_time"
+
+# Join the datasets
+working_df <-
+  full_join(longer_df, working_df , by = "record_time")
+
+
+# impute NAs by linear intrapolation
+# na.interapolation  only works with numeric data
+working_df <- working_df %>%
+  select(-wear_location) %>%
+  na_seadec(find_frequency = T)
+
+
+# Repeat the data three times for each timestep
+working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+start_time <- working_df$record_time %>%  first() %>%  as_datetime()
+
+
+# Calculate counts
+counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
+colnames(counts)[1] <- "record_time"
+
+
+#Join with the raw data and impute 
+working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+
+
+# delete transit
+#working_df  %<>% filter(trimmed_activity != "transit")
+
+final_df <- working_df
+
+final_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15))  +
+  ggtitle("Counts for X axis")
+
+
+
+```
+
+
+## Moving Average
+```{r include=T}
+
+
+
+
+
+
+working_df <- fread("Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica/142/142_pock.csv")
+working_df$record_time %<>% as_datetime()
+
+
+
+
+longer_df <-
+  seq(
+    first(working_df$record_time),
+    last(working_df$record_time),
+    by = period(num = 0.1, units = "second")
+  ) %>%  as.data.frame()
+colnames(longer_df) <- "record_time"
+
+# Join the datasets
+working_df <-
+  full_join(longer_df, working_df , by = "record_time")
+
+
+# impute NAs by linear intrapolation
+# na.interapolation  only works with numeric data
+working_df <- working_df %>%
+  select(-wear_location) %>%
+  na_ma()
+
+
+# Repeat the data three times for each timestep
+working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+start_time <- working_df$record_time %>%  first() %>%  as_datetime()
+
+
+# Calculate counts
+counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
+colnames(counts)[1] <- "record_time"
+
+
+#Join with the raw data and impute 
+working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+
+
+# delete transit
+#working_df  %<>% filter(trimmed_activity != "transit")
+
+final_df <- working_df
+
+final_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Counts for X axis")
+
+
+
+```
+
+
+
+## Linear Method
+
+```{r include=T}
+
+
+working_df <- fread("Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica/142/142_pock.csv")
+working_df$record_time %<>% as_datetime()
+
+
+
+
+longer_df <-
+  seq(
+    first(working_df$record_time),
+    last(working_df$record_time),
+    by = period(num = 0.1, units = "second")
+  ) %>%  as.data.frame()
+colnames(longer_df) <- "record_time"
+
+# Join the datasets
+working_df <-
+  full_join(longer_df, working_df , by = "record_time")
+
+
+# impute NAs by linear intrapolation
+# na.interapolation  only works with numeric data
+working_df <- working_df %>%
+  select(-wear_location) %>%
+  na_interpolation()
+
+
+# plot raw data
+working_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x_axis )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Raw accel data")
+
+# Repeat the data three times for each timestep
+working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+start_time <- working_df$record_time %>%  first() %>%  as_datetime()
+
+
+# Calculate counts
+counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
+colnames(counts)[1] <- "record_time"
+
+
+#Join with the raw data and impute 
+working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+
+
+# delete transit
+#working_df  %<>% filter(trimmed_activity != "transit")
+
+final_df <- working_df
+
+final_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Counts for X axis")
+
+
+
+```
+
+
+
+## Simple Fill
+```{r include=T}
+
+
+
+
+
+working_df <- fread("Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica/142/142_pock.csv")
+working_df$record_time %<>% as_datetime()
+
+
+
+
+longer_df <-
+  seq(
+    first(working_df$record_time),
+    last(working_df$record_time),
+    by = period(num = 0.1, units = "second")
+  ) %>%  as.data.frame()
+colnames(longer_df) <- "record_time"
+
+# Join the datasets
+working_df <-
+  full_join(longer_df, working_df , by = "record_time")
+
+
+# impute NAs 
+# na.interapolation  only works with numeric data
+working_df <- working_df %>%
+  select(-wear_location) %>%
+  na_ma()
+
+# plot raw data
+working_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x_axis )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Raw accel data")
+
+
+# Repeat the data three times for each timestep
+working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+start_time <- working_df$record_time %>%  first() %>%  as_datetime()
+
+
+# Calculate counts
+counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
+colnames(counts)[1] <- "record_time"
+
+
+#Join with the raw data and impute 
+working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+
+
+# delete transit
+#working_df  %<>% filter(trimmed_activity != "transit")
+
+final_df <- working_df
+
+final_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15))
+
+
+
+```
+
+## Spline Method
+
+```{r include=T}
+
+
+working_df <- fread("Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica/142/142_pock.csv")
+working_df$record_time %<>% as_datetime()
+
+
+
+
+longer_df <-
+  seq(
+    first(working_df$record_time),
+    last(working_df$record_time),
+    by = period(num = 0.1, units = "second")
+  ) %>%  as.data.frame()
+colnames(longer_df) <- "record_time"
+
+# Join the datasets
+working_df <-
+  full_join(longer_df, working_df , by = "record_time")
+
+
+# impute NAs 
+# na.interapolation  only works with numeric data
+working_df <- working_df %>%
+  select(-wear_location) %>%
+  na_interpolation(option = "spline" , n = 2)
+
+# plot raw data
+working_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x_axis )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Raw accel data")
+
+
+# Repeat the data three times for each timestep
+working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+start_time <- working_df$record_time %>%  first() %>%  as_datetime()
+
+
+# Calculate counts
+counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
+colnames(counts)[1] <- "record_time"
+
+
+#Join with the raw data and impute 
+working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+
+
+# delete transit
+#working_df  %<>% filter(trimmed_activity != "transit")
+
+final_df <- working_df
+
+final_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15))
+
+
+
+```
+
+
+
+
+
+
+## Stinterp Method
+
+```{r include=T}
+
+
+working_df <- fread("Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica/142/142_pock.csv")
+working_df$record_time %<>% as_datetime()
+
+
+
+
+longer_df <-
+  seq(
+    first(working_df$record_time),
+    last(working_df$record_time),
+    by = period(num = 0.1, units = "second")
+  ) %>%  as.data.frame()
+colnames(longer_df) <- "record_time"
+
+# Join the datasets
+working_df <-
+  full_join(longer_df, working_df , by = "record_time")
+
+
+# impute NAs by linear intrapolation
+# na.interapolation  only works with numeric data
+working_df <- working_df %>%
+  select(-wear_location) %>%
+  na_interpolation(option = "stine" )#, method="parabola"
+
+
+# plot raw data
+working_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x_axis )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15)) +
+  ggtitle("Raw accel data")
+
+# Repeat the data three times for each timestep
+working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+start_time <- working_df$record_time %>%  first() %>%  as_datetime()
+
+
+# Calculate counts
+counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
+colnames(counts)[1] <- "record_time"
+
+
+#Join with the raw data and impute 
+working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+
+
+# delete transit
+#working_df  %<>% filter(trimmed_activity != "transit")
+
+final_df <- working_df
+
+final_df %>%  ggplot() +
+  geom_point(aes(x = record_time, y= x )) +
+  scale_x_datetime(breaks = pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = pretty_breaks( n = 15))
+
+
+
+```
+

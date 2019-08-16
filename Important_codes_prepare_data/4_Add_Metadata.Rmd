@@ -1,0 +1,73 @@
+---
+title: "Add Age Height Weight and Gender"
+author: "Javad Khataei"
+date: "7/4/2019"
+output: html_document
+---
+
+## This code adds Age Height Weight and Gender to Ethica_jaeger_combined dataset
+
+
+Set the working directoies
+```{r}
+library(data.table)
+library(dplyr)
+library(lubridate)
+
+# Get the os type
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  path <<-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/"
+} else {
+  path <<-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data/"
+}
+setwd(path)
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = path)
+```
+
+
+
+
+Read the Metadate
+```{r}
+metadata_path <- paste0(path, "Smart_AccelStudy_Participant Register & O2 calculator - Register.csv")
+
+# read the metadata file starting from row 2 and the age, height and weight columns
+metadata <- read.csv(metadata_path, header = T, skip = 2, check.names = F) [ ,c(2, 6, 7, 8, 10)] 
+
+# fix the metadata column names
+metadata_col_names <- c("participant_id", "height", "weight", "age", "gender")
+colnames(metadata) <- metadata_col_names
+```
+
+
+Read the Ethica_jaeger_combined data
+```{r}
+df <- fread("Ethica_Jaeger_Merged/Ethica_jaeger_merged.csv")
+
+```
+
+Join two datasets
+```{r}
+metadata <- metadata %>% 
+  mutate(participant_id = as.character(participant_id))
+df <- df %>% mutate(participant_id = as.character(participant_id))
+
+final_data_frame <- left_join(df, metadata, by = "participant_id")
+```
+
+Save the result
+
+```{r}
+path  <- paste0(path,"Ethica_Jaeger_Merged/")
+setwd(path)
+fwrite(final_data_frame,file = "Ethica_jaeger_merged_metadata.csv")
+```
+

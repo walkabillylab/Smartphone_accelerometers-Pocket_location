@@ -1,0 +1,104 @@
+---
+title: "Time Adjustment for Ethica data"
+author: "Javad Khataei"
+date: "7/9/2019"
+output:
+  html_document:
+    code_folding : hide
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r message=FALSE, warning=FALSE}
+
+# import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(activityCounts)
+library(tm)
+library(scales)
+
+
+#Set working directory
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica_jaeger_combined/"
+} else {
+  path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica_jaeger_combined/"
+}
+setwd(path)
+
+#read the Ethica_jaeger data
+Ethica_Jaeger <<- fread("Ethica_jaeger_merged_metadata.csv")
+```
+
+I had prepared the Ethica data before, and after that, I merged it with Jaeger data to have a labelled dataset.
+
+We subtracted 2:30 from the raw data to sync it with the Jaeger; however, when we plot accelerometer data and then colour it based on the activity, it seems that it is not synchronized accurately. This plot shows that for participant # 151,  we need to shift the colours about five minutes to match the activity types. So instead of subtracting 2:30 from the raw data, we need to do 2:35 to perfectly sync them. 
+How this 2:35 hours was added to the raw data in the first place? The 2:30 part is probably due to the Time Zone difference, but the origin of the extra 5 minute is unknown.
+
+
+### Participant 151, pocket location, Y axis
+According to the Jaeger file, for this participant, running at 7 METs started at 14:47 and finished at 14:57.
+ 
+```{r}
+p <- 151 
+w<- "pock"
+working_df <- Ethica_Jaeger %>% 
+  select(record_time,x_axis,y_axis,z_axis,participant_id,wear_location,activity) %>% 
+  na.omit() %>% 
+  filter(.,participant_id == p & wear_location == w)
+
+working_df$record_time <- as_datetime(working_df$record_time)
+# trim the activity, remove whitespace, then numbers
+working_df$activity <- working_df$activity %>%
+  trimws() %>%
+  removeWords(c("1-", "2-" , "3-", "4-" , "5-" , "6-" , "7-" , "8-" , "9-"))  
+
+ggplot(working_df)+
+  geom_point(aes(x =record_time ,y = y_axis ,col = activity)) +
+  scale_x_datetime(breaks = pretty_breaks(n = 30)) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+
+
+
+Also, for some other participants, like number 124, the data was too bad. I realized that for the subjects participated before the Daylight saving time, which is 3:00 a.m. on Sunday, March 10, the difference is 3:35 instead of 2:35. I validated this by plotting participants of March and comparing their start and end time from the raw Ethica data and the Jaeger files. This is the plot before adjusting for participant#124:
+
+### Participant 124, pocket location, Y axis
+According to the Jaeger file, for this participant, running at 7 METs started at 16:19 and finished at 16:29.  However, we don't see a noticeable activity during this period, unlike participant#152.
+ 
+```{r}
+p <- 124 
+w<- "pock"
+working_df <- Ethica_Jaeger %>% 
+  select(record_time,x_axis,y_axis,z_axis,participant_id,wear_location,activity) %>% 
+  na.omit() %>% 
+  filter(.,participant_id == p & wear_location == w)
+
+working_df$record_time <- as_datetime(working_df$record_time)
+# trim the activity, remove whitespace, then numbers
+working_df$activity <- working_df$activity %>%
+  trimws() %>%
+  removeWords(c("1-", "2-" , "3-", "4-" , "5-" , "6-" , "7-" , "8-" , "9-"))  
+
+ggplot(working_df)+
+  geom_point(aes(x =record_time ,y = y_axis ,col = activity)) +
+  scale_x_datetime(breaks = pretty_breaks(n = 30)) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+I need to fix this issue, export the Ethica data for each person and then merge it with Jaeger again.
+
+

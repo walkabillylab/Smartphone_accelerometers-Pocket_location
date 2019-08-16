@@ -1,0 +1,214 @@
+---
+title: "Syncing Ethica data"
+author: "Javad Khataei"
+date: "7/29/2019"
+output:
+  html_document:
+    code_folding : hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Main Steps:
+1. Read Ethica raw data
+2. Focus on one participant e.g. 108
+3. From Jaeger folder read timing and exctract start and end time
+5. Loops 10 times and esch time
+    1. Alter recordtime, and change the frequency
+    2. Create a longer dataframe and join it with timing.csv
+    3. join the result and Ethica
+    4. Impliment a model and calculate store accuracy
+6. print the highest accuracy and the time period added to the Ethica
+
+
+
+## Read the Raw data
+
+```{r}
+
+#import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(magrittr)
+library(janitor) # to fix col names
+library(qdapTools) # for hr to sec
+
+# create the main directory to the folder that has the raw data and the intervals file
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  main_path <<-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+} else {
+  main_path <<-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+}
+
+options(digits.sec = 5)
+
+# read the first month for the pocket location 2675
+Ethica_df <- fread(paste0(main_path,"/Ethica/2675_2019_01_accelerometer.csv"))
+Ethica_df$record_time %<>% as_datetime() 
+#create an accurate date column
+Ethica_df$date <- Ethica_df$record_time %>% as.Date()
+
+```
+
+
+## work with participant 108 which is in the read data
+
+### From Jaeger folder read timing and exctract start and end time
+
+```{r}
+# set the participant
+p_id <- 108
+
+# read timing file
+timing_df <- fread(paste0(main_path,"/Jaeger/",p_id,"/timing.csv")) %>% 
+  clean_names()
+
+# reformat time and date
+timing_df$start_time <- timing_df$start_time %>% 
+  as_datetime( format = "%m/%d/%Y %H:%M") %>% 
+  as.data.frame()
+
+timing_df$end_time <- timing_df$end_time %>% 
+  as_datetime( format = "%m/%d/%Y %H:%M") %>% 
+  as.data.frame()
+
+# create a recordtime column for merging with other datasets
+timing_df$record_time <- timing_df$start_time 
+
+
+
+# stat and end of the study
+study_start_date <- timing_df$start_time %>% 
+  first() %>% 
+  as.Date()
+
+study_start_time <- timing_df$start_time %>% 
+  first() 
+
+study_end_time <- timing_df$start_time %>% 
+  last() %>% 
+  as_datetime()
+
+```
+
+## Loop section
+See the comments inside the code
+
+```{r}
+# create a vector of times
+time_diffs <- ((1:10)  * period(num = 30, units = "sec")) + lubridate::hms("2:30:00")
+
+working_df <- Ethica_df %>% filter(date == study_start_date)
+working_df$record_time  %<>% as_datetime()
+
+
+for (time_dif in time_diffs) {
+  
+  #change this 
+ working_df$record_time <- working_df$record_time   - time_diffs[1]
+ 
+ # set a freq
+ output_freq <- 40
+ 
+ 
+ ############### filter based on the start and end data
+ tomorrow
+ 
+ 
+ # change the freq
+ working_df <- working_df %>% change_freq(df = .,output_freq =  output_freq)
+ 
+ # create a longer dataframe to cover all the missing observation in Ethica
+ time_step_len <-  1/ output_freq
+ longer_df <- seq(from = study_start_time,
+                   to = study_end_time,
+                   by = period(num = time_step_len , units = "sec")) %>%
+   as.data.frame()
+ colnames(longer_df) <- "record_time"
+ 
+ # give the longer df a label
+ longer_df  %<>% full_join(.,timing_df, by= "record_time") %>% 
+   fill(task_name)
+ 
+ # share the label with Ethica
+ working_df  %<>% full_join(longer_df, by = "record_time")
+ 
+ 
+ 
+ 
+ 
+  
+}
+
+# filter ethica based on start and end
+
+
+# 1. Alter recordtime, and change the frequency
+#     2. Create a longer dataframe and join it with timing.csv
+#     3. join the result and Ethica
+#     4. Impliment a model and calculate/ store accuracy
+
+```
+
+
+
+## Function to the frequency 
+```{r}
+
+change_freq <- function(df, output_freq = output_freq){
+  
+  #deellete this
+  df<- working_df
+  
+  df <- df %>%  select(record_time, x_axis, y_axis, z_axis)
+  # convert character to data
+  df$record_time <- df$record_time %>% as_datetime()
+  
+  #cut the first second so data starts from hh:mm:ss:00 not ss:xx
+  ceiling_start_time <- df$record_time %>%
+    first() %>%
+    ceiling_date(unit = "sec")
+  df %<>% filter(record_time > ceiling_start_time)
+  
+  # create a floor column
+  df$floored_time <- df$record_time %>% 
+    floor_date(unit = "sec")
+  
+  # for some seconds we have 16 to readings so we need to increase
+  # the readings to have enough data to produce a freq of 30 or 40
+  # Repeat the data three times for each timestep
+  df <- df[rep(1:nrow(df) , each = 3), ]
+  
+  df <- df %>%
+    add_count(floored_time)
+  
+  # add row number inside the groups
+  df %<>% group_by(floored_time) %>% mutate(id = row_number())
+     
+  df$newcol <- floor(output_freq * df$id / df$n)
+  
+  df <- df %>% group_by(floored_time , newcol) %>% 
+    select(record_time,x_axis, y_axis, z_axis) %>%
+    summarise(
+      record_time = mean(record_time),
+      x_axis = mean(x_axis) ,
+      y_axis = mean(y_axis),
+      z_axis = mean(z_axis)
+    )
+  df$record_time <- df$floored_time + df$newcol*period(num = 1/output_freq , units = "sec")
+  return(df)
+  
+  
+}
+
+  
+
+```
+

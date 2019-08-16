@@ -1,0 +1,9 @@
+1- Make sure the raw CSV file with proper names are inside Ethica folder
+Proper name example: 2673_2019_01_accelerometer.csv
+
+2- Open "Ethica_reader_extract_from_intervals.R"
+
+3- Run the code 
+Note: make sure the main_path is correct
+
+4- For each participant, a folder is created and contains three CSV files. Done.

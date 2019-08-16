@@ -1,0 +1,64 @@
+---
+title: "Plot Counts"
+author: "Javad Khataei"
+date: "7/8/2019"
+output:
+  html_document:
+    code_folding : hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### This notebook plots counts calculted by the library "activityCounts" for each participants
+
+Read the combined data. This data has Ethica, Jaeger and metadata for each participant.
+```{r}
+
+# import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(activityCounts)
+
+#Set working directory
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica_jaeger_combined/"
+} else {
+  path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica_jaeger_combined/"
+}
+setwd(path)
+
+#read the Ethica_jaeger data
+Ethica_Jaeger <<- fread("Ethica_jaeger_merged_metadata_total.csv")
+```
+
+Calculate counts
+```{r}
+working_df <- Ethica_Jaeger %>%
+  select(record_time,x_axis,y_axis,z_axis) %>% 
+  na.omit()
+  
+working_df$record_time <- as_datetime(working_df$record_time)
+counts_df <<- counts(working_df,hertz = 10,time_column = 1,x_axis = 2,y_axis = 3,z_axis = 4) 
+```
+
+Assign user id by joining counts and the initial combined data
+```{r}
+working_df <- Ethica_Jaeger %>%
+  select(record_time, participant_id,activity) %>% 
+  na.omit()
+  
+# create "Time" column to join with
+working_df$Time <- as_datetime(working_df$record_time)
+
+counts_df <- counts_df %>% 
+  left_join(., working_df , by = "Time") %>% 
+  select(-record_time)
+
+```
+
+Plot counts for participants and color base on the activity type

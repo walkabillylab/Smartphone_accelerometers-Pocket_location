@@ -1,0 +1,134 @@
+---
+title: "Combine Ethica data"
+author: "Javad Khataei"
+date: "7/11/2019"
+output:
+   html_document:
+     code_folding : hide
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### Summary:
+This file reads  Ethica files for each participant and different wear locations. Then it imputed the gaps of the accelerometer data, and finally, it binds them together to have a single dataset.
+
+### Steps:
+
+1. Create file names, for example: "/108/108_hand.csv."
+2. Read the files and create a longer dataset for each that doesn't have the gap.
+The start and the end time of the longer dataset are the same as each file, but there is no gap.
+3. Join the two datasets and impute numeric values with the interpolation method
+4. Impute the wear locations
+5. Repeat this for all files and bind them
+6. Save the results into "Ethica_imputed_combined.csv"
+
+
+#### Run this chunk
+```{r eval= FALSE}
+
+#import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(activityCounts)
+library(imputeTS)
+
+
+##-------------------------------------The root folder---------------------------------##
+# set the working directory to the folder that has the raw data and the intervals file
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  main_path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica"
+} else {
+  main_path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica"
+}
+setwd(dir = main_path)
+
+
+#read intervals file to get the participants ids
+participant_list <- fread("intervals.csv")
+
+# for participants 100 to 107, 110, 135, and 148 there is no Jaeger data. Also, Ethica data is not available in 2018
+# so use participats 108, 109 , 111 to 159
+
+
+participant_list <-
+  participant_list %>%  na.omit() %>% slice((9:59)) %>% slice(c(-3,-28,-41)) %>% select(userid)
+
+# create a list of possible wear locations
+wear_locations <- c("hand", "back", "pock")
+
+# create a dataset to store all the final data
+final_df <- NULL
+
+# Read Ethica files, impute each one of them, and then bind them
+participant_list$userid %>% map(function(participant_id) {
+  wear_locations %>%  map(function(wear_loc) {
+    # create Ethica file name a based on wear_loc and participant_id
+    Ethica_file_name <<-
+      paste0(participant_id, "/", participant_id, "_", wear_loc, ".csv")
+    
+    # read and convert to datetime
+    working_df <- fread(Ethica_file_name)
+    working_df$record_time <-
+      working_df$record_time %>% as_datetime()
+    
+    ##---------status---------------#
+    print(paste0(Ethica_file_name," is read"))
+    
+    ## Create a dataframe with the same staring and end point as the data
+    longer_df <-
+      seq(
+        first(working_df$record_time),
+        last(working_df$record_time),
+        by = period(num = 0.1, units = "second")
+      ) %>%  as.data.frame()
+    colnames(longer_df) <- "record_time"
+
+    # Join the datasets
+    working_df <-
+      full_join(longer_df, working_df , by = "record_time")
+    
+    
+    # impute NAs by linear intrapolation
+    # na.interapolation  only works with numeric data
+    working_df <- working_df %>%
+      select(-wear_location) %>%
+      na_interpolation()
+    
+    # add  wear location
+    working_df$wear_location <- wear_loc
+    
+    #order data to solve the prblem with P #111,122, 125, 151
+    ##### ========== you can remove it if the problem is solved
+    #working_df <- working_df %>% arrange(record_time)
+
+    
+    #save for each participant
+    fname <- paste0(participant_id,"_",wear_loc,"_imputed.csv")
+    fwrite(working_df,file = paste0("Imputed/",fname))
+
+
+    # bind all the data and store in final_df
+    final_df <<- bind_rows(final_df, working_df)
+    
+
+    
+    ##---------status---------------#
+    print(paste0(Ethica_file_name," is added"))
+    
+  })
+
+})
+fwrite(x = final_df,file = "Ethica_imputed_combined.csv")
+
+```
+
+

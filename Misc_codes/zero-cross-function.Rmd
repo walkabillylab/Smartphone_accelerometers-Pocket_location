@@ -1,0 +1,61 @@
+---
+title: "Zero Crossing"
+author: "Javad Khataei"
+date: "8/9/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this file, we have a selec a window size and calculate the number of the times the wave crosses itsmedian inside the window.  
+"zero crossings is the number of the times that the signal crosses its median"
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+# set the window size
+window_size <- 20
+
+# a sample df
+df <- data.frame(
+    id = 1:20,
+    time = as.Date('2009-01-01') + 0:19,
+    x = c(1:10, 1.5:10.5),
+    y = c(1:10, 1.25:10.25)
+
+)
+
+# Blue is x, red is y median
+plot(x = df$time, df$x)
+median  <- median(df$x)
+abline(h= median, col="blue")
+print(paste0("for x the median is",median))
+
+plot(x = df$time, df$y)
+median  <- median(df$y)
+abline(h= median, col="red")
+print(paste0("for y the median is ",median))
+
+
+
+# the zero crossing function
+df %>%  select(x,y) %>% 
+    zoo::rollapply(
+        data = .,
+        width = window_size ,
+        by = window_size,
+        FUN = function(x) {
+            x_centralized <- x - median(x = x, na.rm = T)
+            zcr <- 0
+            for (i in 1:(window_size-1)){
+                if (x_centralized[i] * x_centralized[i+1] < 0)  zcr <- zcr +1
+            }
+            return(zcr)
+            
+        }
+    ) %>%
+    as.data.frame() %>%  kableExtra::kable(caption = "Zero crossing for x and y") %>% 
+    kableExtra::kable_styling(full_width = T)
+
+```

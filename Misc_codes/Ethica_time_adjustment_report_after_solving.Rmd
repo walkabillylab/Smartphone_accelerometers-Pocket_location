@@ -1,0 +1,120 @@
+---
+title: "Time Adjustment for Ethica data"
+author: "Javad Khataei"
+date: "7/9/2019"
+output:
+  html_document:
+    code_folding : hide
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r message=FALSE, warning=FALSE}
+
+# import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(activityCounts)
+library(tm)
+library(scales)
+
+
+#Set working directory
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica_Jaeger_Merged/"
+} else {
+  path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica_Jaeger_Merged/"
+}
+setwd(path)
+
+#read the Ethica_jaeger data
+Ethica_Jaeger <<- fread("Ethica_jaeger_merged.csv")
+```
+
+- For Pocket location time difference is 2:30
+- For Back and hand locations time difference is 2:35
+
+### Participant 150, back location, Y axis
+
+```{r}
+p <- 150 
+w<- "back"
+working_df <- Ethica_Jaeger %>% 
+  select(record_time,x_axis,y_axis,z_axis,participant_id,wear_location,activity) %>% 
+  na.omit() %>% 
+  filter(.,participant_id == p & wear_location == w)
+
+working_df$record_time <- as_datetime(working_df$record_time)
+# trim the activity, remove whitespace, then numbers
+working_df$activity <- working_df$activity %>%
+  trimws() %>%
+  removeWords(c("1-", "2-" , "3-", "4-" , "5-" , "6-" , "7-" , "8-" , "9-"))  
+
+ggplot(working_df)+
+  geom_point(aes(x =record_time ,y = y_axis ,col = activity)) +
+  scale_x_datetime(breaks = pretty_breaks(n = 30)) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+
+
+### Participant 150, pocket location, Y axis
+
+
+ 
+```{r}
+p <- 150 
+w<- "pock"
+working_df <- Ethica_Jaeger %>% 
+  select(record_time,x_axis,y_axis,z_axis,participant_id,wear_location,activity) %>% 
+  na.omit() %>% 
+  filter(.,participant_id == p & wear_location == w)
+
+working_df$record_time <- as_datetime(working_df$record_time)
+# trim the activity, remove whitespace, then numbers
+working_df$activity <- working_df$activity %>%
+  trimws() %>%
+  removeWords(c("1-", "2-" , "3-", "4-" , "5-" , "6-" , "7-" , "8-" , "9-"))  
+
+ggplot(working_df)+
+  geom_point(aes(x =record_time ,y = y_axis ,col = activity)) +
+  scale_x_datetime(breaks = pretty_breaks(n = 30)) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+### Participant 150, hand location, Y axis
+
+ 
+```{r}
+p <- 150 
+w<- "hand"
+working_df <- Ethica_Jaeger %>% 
+  select(record_time,x_axis,y_axis,z_axis,participant_id,wear_location,activity) %>% 
+  na.omit() %>% 
+  filter(.,participant_id == p & wear_location == w)
+
+working_df$record_time <- as_datetime(working_df$record_time)
+# trim the activity, remove whitespace, then numbers
+working_df$activity <- working_df$activity %>%
+  trimws() %>%
+  removeWords(c("1-", "2-" , "3-", "4-" , "5-" , "6-" , "7-" , "8-" , "9-"))  
+
+ggplot(working_df)+
+  geom_point(aes(x =record_time ,y = y_axis ,col = activity)) +
+  scale_x_datetime(breaks = pretty_breaks(n = 30)) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+

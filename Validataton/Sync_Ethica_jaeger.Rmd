@@ -1,0 +1,96 @@
+---
+title: "How to sync Ethica and Jaeger"
+author: "Javad Khataei"
+date: "7/17/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  main_path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+} else {
+  main_path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+}
+knitr::opts_chunk$set(echo = TRUE , eval =F)
+knitr::opts_knit$set(root.dir= main_path)
+```
+
+
+
+
+1. Use Jan, 108 and 1?? Only pocket 75
+2. Use 10 min before and after for them according to intervals
+So if interval says 10:30 to 11:40 we select 10:20 to 11:50. Still apply 2:30 difference.
+3. Use a loop up to 20 it goes
+    1. For each loop add 30 sec and create a data set
+    2. Merge the data set with Jaeger (No need for combining all the data)
+    3. Trim the activity and make it ready for classification. No need for metadata
+4. Delete "transit"
+5. Optional; Delete 10% from the beginning and the end
+6. Calculate Counts
+7. Apply a simple model
+8. Find the best one and choose that for time adjustment
+
+```{r include=FALSE}
+#import packages and read the data
+
+#import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(activityCounts)
+library(imputeTS)
+library(caret)
+library(magrittr)
+
+main_df <- fread("Ethica_Jaeger_Merged/pocket/pocket.csv")
+
+working_df <- main_df %>% filter(participant_id == 108) %>%  select(record_time,x_axis,y_axis,z_axis,trimmed_activity)
+
+working_df$record_time  %<>% as_datetime()
+
+```
+
+
+
+## Create Counts
+```{r}
+# Change frequency
+# Repeat the data three times for each timestep
+working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+start_time <- working_df$record_time %>%  first() %>%  as_datetime()
+
+
+# Calculate counts
+counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
+colnames(counts)[1] <- "record_time"
+
+
+#Join with the raw data and impute 
+working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+
+
+# delete transit
+working_df  %<>% filter(trimmed_activity != "transit")
+
+
+#save for Weka
+fwrite(working_df,"Ethica_Jaeger_Merged/pocket/108_pocket_counts.csv")
+
+```
+
+
+## Create a Simple Model
+We use Caret to build a linear model for classification:
+```{r}
+
+
+
+
+
+```
+

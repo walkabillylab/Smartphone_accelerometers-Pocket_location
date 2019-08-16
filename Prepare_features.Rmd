@@ -1,0 +1,109 @@
+---
+title: "Prepare_features"
+author: "Javad Khataei"
+date: "7/5/2019"
+output: html_document
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose of this code
+In this code, we work with the dataset created by joining the Ethica and Jaeger files.
+
+- First, we trim the activity column and remove the numbers from it
+- Second, we consider the Activity as our outcome so we remove all the Jaeger data but the trimmed activity
+- Third, we create three different scenarios
+  1. In the first one, the wear location is the outcome and we don't consider the activity type
+  2. For the second one, only the activity type is the outcome and we don't consider the wear location
+  3. For the third one, we have 18 different classes and we consider both activity type and wear location
+
+### Read the data
+```{r message=FALSE, warning=FALSE}
+# load the libraries
+library(tidyverse)
+library(data.table)
+library(lubridate)
+library(tm)
+
+# set your working directory and read the file
+complete_df <<- fread("Ethica_jaeger_merged_metadata_total.csv")
+```
+
+### Trim the activity
+```{r}
+# remove whitespace, then numbers
+complete_df <- complete_df$activity %>%
+  trimws() %>%
+  removeWords(c("1-", "2-" , "3-", "4-" , "5-" , "6-" , "7-" , "8-" , "9-")) %>%
+  mutate(complete_df, activity_trimmed = .)
+```
+
+
+
+### The wear location is the only outcome
+```{r}
+# use this to model wear location
+df_wear <<-
+  complete_df %>% select(
+    record_time,
+    participant_id,
+    x_axis,
+    y_axis,
+    z_axis,
+    height,
+    weight,
+    age,
+    gender,
+    wear_location
+  )
+```
+
+### The trimmed activity is the only outcome
+```{r}
+# use this to model type of activity
+df_activity <<-
+  complete_df %>% select(
+    record_time,
+    participant_id,
+    x_axis,
+    y_axis,
+    z_axis,
+    height,
+    weight,
+    age,
+    gender,
+    activity_trimmed
+  )
+```
+
+### Both the activity and the wear location are outcomes
+Here we have 21 different labels
+```{r}
+# use this to model both wear location and activity
+df_aw <<-
+  complete_df %>% select(
+    record_time,
+    participant_id,
+    x_axis,
+    y_axis,
+    z_axis,
+    height,
+    weight,
+    age,
+    gender,
+    wear_location,
+    activity_trimmed
+  ) %>% 
+  filter(., !is.na(complete_df$x_axis)) 
+
+df_aw <<- df_aw %>% 
+  add_column(.,wear_activity = paste0(df_aw$wear_location,"/",df_aw$activity_trimmed))
+
+
+df_aw$wear_activity <- str_replace_all(df_aw$wear_activity, " ", "_")
+
+```
+

@@ -1,0 +1,707 @@
+---
+title: "Ethica Data Preparation"
+author: "Javad Khataei"
+date: "02/07/2019"
+output:
+  html_document:
+    code_folding: hide
+    variant: markdown_strict
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
+```
+
+#### This file is an explanation for the data cleaning and extracting process. To extract the data, read the readme file and do not run this code.  
+
+## Summary
+In this document, I explain the steps that I took to prepare the data for the SmartPhone Accel study.   First, we need to understand the nature of the raw data and its issues. Second, We fix the problems and make the data ready for labeling. Third, we need to extract each participant data from these datasets and save them in separate CSV files. After this step, each person will have three different CSV files which have the accelerometer data for three different wear locations. Finally, we merge our data with the Jaeger data based on the record time.
+  
+## Steps:
+
+1. Extract data for each participant:
+    1. Read the list of participants and their start and end time
+    2. Adjust the time of the raw data
+    3. Slice the raw data for each participant based on their time
+    4. Change the frequency to 10 Hz.
+After this step, each participant has three CSV files. However, there are some missing timesteps.
+
+2. Impute and combine. Use a loop and for each participant to:
+    1. Create an empty dataset with a frequency of 10 Hz 
+    2. Join this empty dataset with data from the previous step
+    3. Impute the missing timesteps with linear interpolation
+    4. merge the data with the previous participant
+After this step, we have a comprehensive dataset that has the accelerometer data for all participants.
+3. Merge with the Jaeger data
+    1. Join the data and select only the activity column from the Jaeger
+    2. Trim the activity column and store in trimmed_activity
+    3. Impute the labels (trimmed_activity) by the "fill" method
+    4. Save the data into "Ethica_jaeger_merged.csv" file
+
+4. Add metadata
+    1. Read the metadata from the "Smart_AccelStudy_Participant Register & O2 calculator - Register.csv" file
+    2. merge the data with the "Ethica_jaeger_merged.csv" file
+
+## Ethica Accelerometer Data
+
+Ethica exports the data based on the month; therefore, for each month, we download a separate zip file. Also, since we used three different devices to record the data, for each month, we have three different zip files. Each file has nine different columns.
+
+#### columns' names
+"user_id", "date", "device_id", "record_time", "timestamp", "accu", "x_axis", "y_axis", and "z_axis"
+
+### Wear Location
+The first column of the data is user_id and use this column to identify the wear location of the device. Each participant used three smartphones to collect the data. The first one with an  user_id of 2673 was held in the participant's hand.  The second phone, with an user_id of 2674 was in the participant's backpack. The last device was in the participant's pocket, and its user_id is 2675.  
+
+### Record Time
+The second important column is the record_time column, which shows the reading time. One of the issues that we need to investigate more is the problem of record_time nonuniformity. For some seconds, we have 16 or 17 readings, and for some other seconds, we have 48 or 51 readings.  
+To solve this issue, I decided to downsample the data and reduce its frequency to 10 measurements per second. I used this function to calculate the mean of the accelerometer readings for each tenth of a second to change the frequency. 
+
+#### The frequency convert function 
+```{r eval=FALSE}
+convert_freq <- function(df) {
+  df <- df %>%  select(record_time, x_axis, y_axis, z_axis)
+  
+  # convert character to data
+  df$record_time <- df$record_time %>% as_datetime()
+  
+ 
+  # floor the datetime to 0.1s intervals
+  df <-
+    df$record_time %>% floor_date(unit = "0.1s") %>% mutate(df, record_time = .)
+  
+  # calculate the mean of the readings inside the time period
+  df_10hrz <-
+    df %>% group_by(record_time) %>%  select(x_axis, y_axis, z_axis) %>%
+    summarise(
+      x_axis = mean(x_axis) ,
+      y_axis = mean(y_axis),
+      z_axis = mean(z_axis)
+    )
+  
+  return(df_10hrz)
+}
+```
+  
+There are other columns such as date, device_id, timestamp and accu; however, we don't need to use them for our analysis. Note that the "accu" column shows the accuracy of the readings and if its value is three, it means the measurement was accurate.  
+
+## Step one: Extract data for each participant
+
+
+To use this code, we need to make sure that all the raw CSV files and the "intervals" file are inside the main_path folder. Here the main_path is set to "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica".   
+
+```{r eval=FALSE}
+
+##-------------------------------------The root folder---------------------------------##
+# set the working directory to the folder that has the raw data and the intervals file
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  main_path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica"
+} else {
+  main_path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica"
+}
+setwd(dir = main_path)
+
+```
+
+  
+### Looping the wear location and the date
+We have a file named "intervals", which has the start and the end time for each participant. We use this file to extract the data of each participant. We loop through, all months and wear locations in the code.  
+```{r}
+mons <- c("01","02","03","04",'05')
+dev_ids <- c("2673","2674","2675")
+# #set the study year
+study_year <- "2019"
+
+for (dev_id in dev_ids) {
+  for (mon in mons) {
+    ## Do stuff
+  }
+}
+```
+
+
+### Get participants' list
+Then, based on the "intervals" file, we discover which participants are inside the selected month. These participants are stored in the variable "Selected_part".
+
+```{r eval = FALSE}
+#Select participants who participated during study_year_month
+Selected_part <-
+  intervals_file %>%  filter(intervals_file$year_month == study_year_month)
+```
+
+### Reading and slicing the data
+In the next step, the Ethica raw data is read, and for each participant inside the "Selected_part" variable, we slice the raw data. To slice the raw data, we use the start and the end time of that particular participant read from the "intervals" file.   
+```{r eval= FALSE}
+    #find the start and the end of the participant's data
+    record_time <<-
+      df$record_time %>% as_datetime() %>%  floor_date(unit = "minute")
+    start_time_index <<-
+      which(record_time > participant_start_time) %>% first()
+    end_time_index <<-
+      which(record_time < participant_end_time) %>% last()
+    
+    #slice the participant's part
+    df_slice <- df %>% slice(start_time_index:end_time_index)
+
+```
+
+### Adjust the time 
+Here, we encounter another issue; the times from the "intervals" file and the raw data do not match. To rectify this problem, we need to subtract 2 hours and 32, 38 or 36 minutes from the raw data.For the subjects participated before the Daylight saving time, which is 3:00 a.m. on Sunday, March 10, the difference is 3 hours and 32, 38 or 36 minutes. We do this adjustment inside the main loop. For each location, this time difference slightly varies so we need to adjust them like this:   
+
+
+```{r eval = FALSE}
+
+# adjust the raw data time using a temporary var
+daylight_saving <- "2019-03-10"
+
+
+# Participants after daylight saving
+temp_df <- df
+if (participant_start_time > daylight_saving) {
+  if (dev_id == "2673") {
+    temp_df$record_time <- temp_df$record_time - hms("2:32:00")
+  } else if (dev_id == "2674") {
+    temp_df$record_time <- temp_df$record_time - hms("2:38:00")
+  } else if (dev_id == "2675") {
+    temp_df$record_time <- temp_df$record_time - hms("2:36:00")
+  }
+  
+} else
+{
+  # Before daylight saving
+  if (dev_id == "2673") {
+    temp_df$record_time <- temp_df$record_time - hms("3:32:00")
+  } else if (dev_id == "2674") {
+    temp_df$record_time <- temp_df$record_time - hms("3:38:00")
+  } else if (dev_id == "2675") {
+    temp_df$record_time <- temp_df$record_time - hms("3:36:00")
+  }
+}
+```
+
+### Mutate the location and participant's id
+After extracting the data, we add the wear location and the participant's id to the dataset, and it is ready to be stored in a CSV file. We create a folder for each participant and save the datasets in it.
+
+```{r eval = FALSE}
+    #add participant's id and waer location
+    df_slice <-
+      df_slice %>% mutate(participant_id = participant_id , wear_location = wear_loc)
+
+    #create folders and save the data
+    p_id <- as.character(participant_id)
+    dir.create(p_id, showWarnings = FALSE)
+    setwd(paste0(p_id, "/"))
+    fwrite(x = df_slice , file = paste0(p_id, "_", wear_loc, ".csv"))
+```
+
+### The complete code
+So after this step, for each participant, we have three CSV files which contain record time, accelerometer data for the X, Y and Z axis, participant id, wear location. The files are ready to get merged with Jaeger data and get labeled. If we put together all the above steps, the complete code is:
+
+```{r}
+
+#import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(scales)
+
+##------------------------ Convert frequency function------------------------------##
+convert_freq <- function(df) {
+  df <- df %>%  select(record_time, x_axis, y_axis, z_axis)
+  # convert character to data
+  df$record_time <- df$record_time %>% as_datetime()
+  
+  #change frequency to 10 hz
+  ## floor or round the datetime to 0.1s intervals
+  df <-
+    df$record_time %>% floor_date(unit = "0.1s") %>% mutate(df, record_time = .)
+  
+  df_10hrz <-
+    df %>% group_by(record_time) %>%  select(x_axis, y_axis, z_axis) %>%
+    summarise(
+      x_axis = mean(x_axis) ,
+      y_axis = mean(y_axis),
+      z_axis = mean(z_axis)
+    )
+  
+  return(df_10hrz)
+}
+
+
+##-------------------------------------The root folder---------------------------------##
+# set the working directory to the folder that has the raw data and the intervals file
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  main_path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica"
+} else {
+  main_path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica"
+}
+setwd(dir = main_path)
+
+
+
+##------------------------- loop through all months and locations---------------------##
+mons <- c("01","02","03","04",'05')
+
+dev_ids <- c("2673","2674","2675")
+# #set the study year
+study_year <- "2019"
+
+
+for (dev_id in dev_ids) {
+  if (dev_id == "2673"){
+    wear_loc <- "hand"
+  }
+  if (dev_id == "2674"){
+    wear_loc <- "back"
+  }
+  if (dev_id == "2675"){
+    wear_loc <- "pock"
+  }
+  
+  
+  for (mon in mons) {
+    
+    #create study's year and month
+    study_year_month <- paste0(study_year, "_", mon)
+    
+    # create the file name to read the data
+    file_name <-
+      paste0(dev_id, "_", study_year, "_", mon, "_accelerometer.csv")
+    
+    
+    #read the accelerameter file
+    df <- fread(file = file_name)
+    df$record_time <- df$record_time %>%  as_datetime() 
+    
+    
+    
+    #change the frequency by calling convert_freq function
+    df <- convert_freq(df)
+    
+    
+    # read the interval files that has all the intrvals for different participants
+    intervals_file <- fread(file = "intervals.csv")
+    
+    
+    # get the year and the month out of intervals_file
+    intervals_file <-
+      as.Date(intervals_file$start) %>%  format(format = "%Y_%m") %>%  as.character() %>% mutate(intervals_file, year_month = .)
+    
+    #Select participants who participated during study_year_month
+    Selected_part <-
+      intervals_file %>%  filter(intervals_file$year_month == study_year_month)
+    
+    
+    # for each selected participant
+    Selected_part$userid %>% map(function(i) {
+      
+      #get the current participant and extract its info,i.e id, start and end time
+      current_participant <-
+        Selected_part %>%  filter(Selected_part$userid == i)
+      
+      participant_id <- current_participant$userid
+      
+      participant_start_time <-
+        current_participant$start %>% as_datetime()
+      
+      participant_end_time <- current_participant$end %>% as_datetime()
+      
+      
+      
+      
+      # adjust the raw data time using a temporary var
+      daylight_saving <-"2019-03-10"
+      
+      
+      # Participants after daylight saving
+      temp_df <- df
+      if (participant_start_time > daylight_saving) {
+        
+        if (dev_id == "2673"){
+          temp_df$record_time <- temp_df$record_time - hms("2:32:00")
+        } else if(dev_id == "2674"){
+          temp_df$record_time <- temp_df$record_time - hms("2:38:00")
+        } else if (dev_id == "2675"){
+          temp_df$record_time <- temp_df$record_time - hms("2:36:00")
+        }
+        
+      } else
+      {
+        # Before daylight saving
+        if (dev_id == "2673"){
+          temp_df$record_time <- temp_df$record_time - hms("3:32:00")
+        } else if(dev_id == "2674"){
+          temp_df$record_time <- temp_df$record_time - hms("3:38:00")
+        } else if (dev_id == "2675"){
+          temp_df$record_time <- temp_df$record_time - hms("3:36:00")
+        }
+      }
+      
+      #find the start and the end of the participant's data
+      record_time <-
+        temp_df$record_time %>% as_datetime() %>%  floor_date(unit = "minute")
+      start_time_index <-
+        which(record_time > participant_start_time) %>% first()
+      end_time_index <-
+        which(record_time < participant_end_time) %>% last()
+      
+      
+      #slice the participant's part
+      df_slice <- temp_df %>% slice(start_time_index:end_time_index)
+      
+      
+      #add participant's id and waer location
+      df_slice <-
+        df_slice %>% mutate(participant_id = participant_id , wear_location = wear_loc)
+      p_id <- as.character(participant_id)
+      dir.create(p_id, showWarnings = FALSE)
+      setwd(paste0(p_id, "/"))
+      fwrite(x = df_slice , file = paste0(p_id, "_", wear_loc, ".csv"))
+      setwd(dir = main_path)
+      
+    })
+  }
+ 
+}
+
+```
+
+## Step two : Impute and combine.
+
+### Read participants' list and their csv files inside a loop
+Note that some one the participants dont have Jaeger data, so wee need to exclude them.
+
+
+```{r message=FALSE, warning=FALSE}
+#read intervals file to get the participants ids
+participant_list <- fread("intervals.csv")
+
+
+# for participants 100 to 107, 110, 135, and 148 there is no Jaeger data. Also, Ethica data is not available in 2018
+# so use participats 108, 109 , 111 to 159
+participant_list <-
+  participant_list %>%  na.omit() %>% slice((9:59)) %>% slice(c(-3,-28,-41)) %>% select(userid)
+
+# create a list of possible wear locations
+wear_locations <- c("hand", "back", "pock")
+
+# create a dataset to store all the final data
+final_df <- NULL
+
+# Read Ethica files, impute each one of them, and then bind them
+participant_list$userid %>% map(function(participant_id) {
+  wear_locations %>%  map(function(wear_loc) {
+    # create Ethica file name a based on wear_loc and participant_id
+    Ethica_file_name <<-
+      paste0(participant_id, "/", participant_id, "_", wear_loc, ".csv")
+    
+    # read and convert to datetime
+    working_df <- fread(Ethica_file_name)
+    working_df$record_time <-
+      working_df$record_time %>% as_datetime()
+```
+### Create an empty dataset with a frequency of 10 Hz 
+```{r}
+    ## Create a dataframe with the same staring and end point as the data
+    longer_df <-
+      seq(
+        first(working_df$record_time),
+        last(working_df$record_time),
+        by = period(num = 0.1, units = "second")
+      ) %>%  as.data.frame()
+    colnames(longer_df) <- "record_time"
+
+```
+
+
+
+
+### Join this empty dataset with data from the previous step
+```{r}
+    # Join the datasets
+    working_df <-
+      full_join(longer_df, working_df , by = "record_time")
+    
+```
+
+### Impute the missing timesteps with linear interpolation
+```{r}
+    
+    # impute NAs by linear intrapolation
+    # na.interapolation  only works with numeric data
+    working_df <- working_df %>%
+      select(-wear_location) %>%
+      na_interpolation()
+    
+    # add  wear location
+    working_df$wear_location <- wear_loc
+ 
+```
+
+### merge the data with the previous participant
+
+```{r}
+    # bind all the data and store in final_df
+    final_df <<- bind_rows(final_df, working_df)
+    
+
+    
+    ##---------status---------------#
+    print(paste0(Ethica_file_name," is added"))
+    
+  })
+
+})
+fwrite(x = final_df,file = "Ethica_imputed_combined.csv")
+
+```
+
+### The complete code is :
+```{r}
+
+#import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(activityCounts)
+library(imputeTS)
+
+
+##-------------------------------------The root folder---------------------------------##
+# set the working directory to the folder that has the raw data and the intervals file
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  main_path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica"
+} else {
+  main_path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica"
+}
+setwd(dir = main_path)
+
+
+#read intervals file to get the participants ids
+participant_list <- fread("intervals.csv")
+
+
+# for participants 100 to 107 and 110, there is no Jaeger data. Also, Ethica data is not available in 2018
+# so use participats 108, 109 , 111 to 159
+participant_list <-
+  participant_list %>%  na.omit() %>% slice((9:59)) %>% slice(-3) %>% select(userid)
+
+# create a list of possible wear locations
+wear_locations <- c("hand", "back", "pock")
+
+# create a dataset to store all the final data
+final_df <- NULL
+
+# Read Ethica files, impute each one of them, and then bind them
+participant_list$userid %>% map(function(participant_id) {
+  wear_locations %>%  map(function(wear_loc) {
+    # create Ethica file name a based on wear_loc and participant_id
+    Ethica_file_name <<-
+      paste0(participant_id, "/", participant_id, "_", wear_loc, ".csv")
+    
+    # read and convert to datetime
+    working_df <- fread(Ethica_file_name)
+    working_df$record_time <-
+      working_df$record_time %>% as_datetime()
+    
+    ##---------status---------------#
+    print(paste0(Ethica_file_name," is read"))
+    
+    ## Create a dataframe with the same staring and end point as the data
+    longer_df <-
+      seq(
+        first(working_df$record_time),
+        last(working_df$record_time),
+        by = period(num = 0.1, units = "second")
+      ) %>%  as.data.frame()
+    colnames(longer_df) <- "record_time"
+
+    # Join the datasets
+    working_df <-
+      full_join(longer_df, working_df , by = "record_time")
+    
+    
+    # impute NAs by linear intrapolation
+    # na.interapolation  only works with numeric data
+    working_df <- working_df %>%
+      select(-wear_location) %>%
+      na_interpolation()
+    
+    # add  wear location
+    working_df$wear_location <- wear_loc
+    
+    # bind all the data and store in final_df
+    final_df <<- bind_rows(final_df, working_df)
+    
+
+    
+    ##---------status---------------#
+    print(paste0(Ethica_file_name," is added"))
+    
+  })
+
+})
+fwrite(x = final_df,file = "Ethica_imputed_combined.csv")
+
+```
+
+
+
+
+
+
+
+## Step three: Merge with Jaeger
+
+After having each participant data in separate files, we can combine them with the Jaeger data.
+
+### Place the files inside the proper folders
+
+To join Ethica and Jaeger data, we need to place the CSV files produced in the previous section and the Jaeger files inside a root folder. As it is shown in the below picture, this root folder has two subfolders.  
+The first subfolder should be named "Ethica", and the second subfolder's name should be "jaeger". Inside the "Ethica" subfolder, place the "intervals.csv" file,  so we can use it to get a list of the participants' ids. Also, put the CSV files created in the previous section inside the "Ethica" folder. In the end, inside the "Ethica" folder, for each participant, we have a subfolder which has three CSV files. Each subfolder's name should be the participant's id. For example, for participant number 108, we have a folder called 108, which has three CSV files.  
+For Jaeger data, we have a similar folder structure. Inside the "jaeger" folder, we have subfolders for each participant. Same as Ethica data, the folders' names are participants ids. Inside those folders, labeled Jaeger files are placed. 
+
+
+
+![Folder structure](https://raw.githubusercontent.com/Javad-mun/R/master/Folder_structure.jpg "The proper folder structure")<br>
+
+### Select the participants
+For the participants 100 to 107 and 110, there is no Jaeger data, so we exclude them from the list.
+
+
+```{r eval= FALSE}
+participant_list <-
+  participant_list %>%  na.omit() %>% slice((9:59)) %>% slice(-3) %>% select(userid)
+
+```
+
+### Read the files
+Next, we read all the Jaeger data and Ethica data for all the participants on the list. To do so, we need to create the proper name of the files.  
+
+```{r eval=FALSE}
+#repeat for each participant in the list
+participant_list$userid %>% map(function(participant_id) {
+  # create Jaeger file path and name based on participant id
+  jaeger_file_path <- paste0("jaeger/", participant_id, "/")
+  jaeger_file_name <-
+    list.files(path = jaeger_file_path, pattern = "*_labeled.csv")
+  jaeger_file_name <- paste0(jaeger_file_path, jaeger_file_name)
+  
+  
+  #if we have the jaeger data then do the rest
+  if (file.exists(jaeger_file_name)) {
+    
+    #read the jaeger data
+    df_jaeger <- fread(jaeger_file_name[1])
+    
+    #repeat for each wear location
+    wear_locations %>%  map(function(wear_loc) {
+      # create Ethica file path and name based on wear_loc
+      Ethica_file_path <- paste0("Ethica/", participant_id, "/")
+      
+      Ethica_file_name <-
+        list.files(path = Ethica_file_path,
+                   pattern =  paste0("*", wear_loc, ".csv"))
+      
+      Ethica_file_name <- paste0(Ethica_file_path, Ethica_file_name)
+     
+      #read Ethica data
+      df_ethica <- fread(file = Ethica_file_name)
+  
+```
+### Merge by time
+Now, we can merge these datasets based on the record time column.  
+```{r eval=FALSE}
+      #prepare the column name and type
+      colnames(df_jaeger)[colnames(df_jaeger) == "DateTime"] <-
+        "record_time"
+      df_ethica$record_time <- df_ethica$record_time %>% as_datetime()
+      df_jaeger$record_time <- df_jaeger$record_time %>% as_datetime()
+      
+      #join the data, first step
+      df_joined <-
+        full_join(x = df_ethica, y = df_jaeger, by = "record_time")
+```      
+
+### Impute missing values
+The datasets are merged; however, the Jaeger frequency is 1, and the Ethica frequency is ten, so from every ten rows, only one of them has the Jaeger data. We need to impute the NA values in the Jaeger data, particularly the activity column; thus, every row is labeled based on its activity. We use the nearest neighbor method to assign an activity to each observation. The VIM package provides a KNN() function which we use to consider the closest neighbor, i.e., k is equal to one.
+
+
+```{r eval = F}
+# impute all NAs in activity column by KNN method from VIM package
+      ## define a helper dataset to change the time to numeric and apply KNN (KNN doesn't work on date class)
+      helper_df <-
+        df_joined %>%  select(c(record_time, activity))  
+      helper_df$record_time <- helper_df$record_time %>%  as.numeric()
+      
+      # apply KNN
+      helper_df <-
+        kNN(data = helper_df , variable = "activity" , k = 1) %>% select(c(record_time, activity))
+      
+      # set the record time of the helper to datetime to join with the main dataset
+      helper_df$record_time <- helper_df$record_time %>% as_datetime()
+      df_joined <- inner_join(df_joined, helper_df , by = "record_time")
+      
+      
+      #remove the extra activiy column and rename the main one
+      df_joined <- df_joined %>% select(-activity.x)
+      colnames(df_joined)[16] <- "activity"
+      
+```
+### Export the data
+In the end,  the merged data for all participants is stored in a CSV file called "Ethica_jaeger_merged_total.csv".
+```{r eval = FALSE}
+      #output file name
+      output_file_name <- paste0(participant_id,"_",wear_loc,"_jaeger_Ethica.csv")
+      #store each participant merged data in a CSV file
+      fwrite(x = df_joined,file = output_file_name)
+      
+      #add the data to the end of total dataset
+      total_df <<- bind_rows(total_df, df_joined)
+    })
+  }
+})
+fwrite(x = total_df, file = "Ethica_jaeger_merged_total.csv")
+```
+### The complete code
+Putting all the pieces together, we have a code which joins and labels the Ethica and the Jaeger data.  
+To see the complete code, open merge_Ethica_Jaeger.R file.
+
+
+## Step four: Add metadata
+
+### Read the metadata from the "Smart_AccelStudy_Participant Register & O2 calculator - Register.csv" file
+
+```{r}
+metadata_path <- paste0(path, "Smart_AccelStudy_Participant Register & O2 calculator - Register.csv")
+
+# read the metadata file starting from row 2 and the age, height and weight columns
+metadata <- read.csv(metadata_path, header = T, skip = 2, check.names = F) [ ,c(2, 6, 7, 8, 10)] 
+
+# fix the metadata column names
+metadata_col_names <- c("participant_id", "height", "weight", "age", "gender")
+colnames(metadata) <- metadata_col_names
+```
+
+### Merge the data with the "Ethica_jaeger_merged.csv" file
+
+```{r}
+
+metadata <- metadata %>% 
+  mutate(participant_id = as.character(participant_id))
+df <- df %>% mutate(participant_id = as.character(participant_id))
+
+final_data_frame <- left_join(df, metadata, by = "participant_id")
+
+```
+
+### The Complete code can be found in the Add_Metadata.RMD file

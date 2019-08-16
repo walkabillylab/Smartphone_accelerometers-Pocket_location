@@ -1,0 +1,174 @@
+---
+title: "Plot Counts"
+author: "Javad Khataei"
+date: "7/8/2019"
+output:
+  html_document:
+    code_folding : hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### This notebook plots counts calculted by the library "activityCounts" for each participants
+
+Read the combined data. This data has Ethica, Jaeger and metadata for each participant.
+```{r}
+
+# import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(activityCounts)
+library(tm)
+library(scales)
+
+
+
+#Set working directory
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica_jaeger_combined/"
+} else {
+  path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica_jaeger_combined/"
+}
+setwd(path)
+
+#read the Ethica_jaeger data
+Ethica_Jaeger <<- fread("Ethica_jaeger_merged_metadata_total.csv")
+```
+### ignore
+Code to calculate counts for all participants
+```{r eval=FALSE, include=FALSE}
+working_df <- Ethica_Jaeger %>%
+  select(record_time,x_axis,y_axis,z_axis,participant_id,wear_location) %>% 
+  na.omit()
+
+
+working_df$record_time <- as_datetime(working_df$record_time)
+
+
+#get participants' list
+participants_list <- unique(working_df$participant_id)
+
+#get wear locations' list
+wear_loc_list <- unique(working_df$wear_location)
+
+
+
+# calculate the counts for each participant and wearlocation separetly
+counts_df <- NULL
+for (p in participants_list) {
+  for (w in wear_loc_list) {
+    counts_df <- filter(working_df,participant_id == p & wear_location == w) %>% 
+      counts(.,hertz = 10, time_column = 1, x_axis = 2, y_axis = 3, z_axis = 4)  %>%
+      mutate(participant_id = p , wear_location = w) %>% 
+      bind_rows(counts_df,.)
+  }
+}
+
+```
+
+
+### ignore
+Assign user id by joining counts and the initial combined data
+```{r eval=FALSE, include=FALSE}
+working_df <- Ethica_Jaeger %>%
+  select(record_time, participant_id,activity,wear_location) %>% 
+  na.omit()
+
+
+# trim the activity, remove whitespace, then numbers
+working_df$activity <- working_df$activity %>%
+  trimws() %>%
+  removeWords(c("1-", "2-" , "3-", "4-" , "5-" , "6-" , "7-" , "8-" , "9-"))  
+
+
+# create "Time" column to join with
+working_df$Time <- as_datetime(working_df$record_time) %>% 
+  floor_date(unit = "second")
+# 
+# counts_df_left <- counts_df %>% 
+#   left_join(., working_df) %>% 
+#   select(-record_time)
+
+counts_df_full <- counts_df %>% 
+  full_join(., working_df) %>% 
+  select(-record_time)
+# 
+# counts_df_right <- right_join(counts_df ,working_df) %>% 
+#   select(-record_time)
+# 
+# counts_df_inner <- counts_df %>% 
+#   inner_join(., working_df ) %>% 
+#   select(-record_time)
+# 
+# counts_df_semi <- counts_df %>% 
+#   semi_join(., working_df, by= "Time" )
+# 
+# counts_df_nest <- counts_df %>% 
+#   nest_join(., working_df , keep= T)
+
+
+
+```
+
+
+counts is not working
+* First:we don't have some missing seconds in the middle of the raw data
+for example participant 115 and pocket we have 25205 rows i.e. ~42 min but should be 50 min, from 10:19 to 11:09,
+raw 7373295 in the very raw data
+* Second, it seems that counts() is not working :
+for example participant 115 and pocket we have 25205 rows, we need 2500 counts,  but we get 841
+
+
+### So let's plot  raw x, y ,z
+
+### For all 3 axis
+```{r}
+p <- 151 
+w<- "pock"
+working_df <- Ethica_Jaeger %>% 
+  select(record_time,x_axis,y_axis,z_axis,participant_id,wear_location,activity) %>% 
+  na.omit() %>% 
+  filter(.,participant_id == p & wear_location == w)
+
+working_df$record_time <- as_datetime(working_df$record_time)
+# trim the activity, remove whitespace, then numbers
+working_df$activity <- working_df$activity %>%
+  trimws() %>%
+  removeWords(c("1-", "2-" , "3-", "4-" , "5-" , "6-" , "7-" , "8-" , "9-"))  
+
+
+
+ggplot(working_df)+
+  geom_point(aes(x =record_time ,y = y_axis ,col = activity)) +
+  scale_x_datetime(breaks = pretty_breaks(n = 30)) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+As we can see the timing is not matched. The very lows are lying periods and we have three of them. Also there are two sitting, one after the first lying the second one between the 5 and 7 runnings.
+
+### all 3 locations
+```{r}
+p <- 153
+ 
+working_df <- Ethica_Jaeger %>% 
+  select(record_time,x_axis,y_axis,z_axis,participant_id,wear_location,activity) %>% 
+  na.omit() %>% 
+  filter(.,participant_id == p)
+
+# trim the activity, remove whitespace, then numbers
+working_df$activity <- working_df$activity %>%
+  trimws() %>%
+  removeWords(c("1-", "2-" , "3-", "4-" , "5-" , "6-" , "7-" , "8-" , "9-"))  
+
+raw_plot <- ggplot(working_df)+
+  geom_point(aes(x =record_time ,y = x_axis ,col = activity)) +
+  facet_wrap(~wear_location)
+
+plot(raw_plot)
+```
+Plot counts for participants and color base on the activity type
