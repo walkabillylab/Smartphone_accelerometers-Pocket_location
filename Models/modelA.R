@@ -18,6 +18,7 @@ library(caret)
 library(stringr)
 library(MLmetrics)
 library(PRROC)
+library(Beap) # It's not on CRAN yet
 
 
 
