@@ -1,0 +1,155 @@
+---
+title: "Model_A_5"
+author: "Javad Khataei"
+date: "8/16/2019"
+output:
+    html_document:
+        code_folding : hide
+        toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Linear imputation, metadata, Counts,, and new features
+
+In this markdown, we use the linear imputed data. **metada, `counts` and new features** variables are used for this model. We read the CSV file which contains x,y and z `Counts` and then apply the following models using the `ApplyModels` function from `BEAP` package:
+
+- `RF`, Random Forest
+- `LDA`, Linear Discriminant Analysis
+- `NB`, Naive Bayes
+- `KNN`, k-Nearest Neighbors
+- `SVM`, Support Vector Machines
+- `DT`, desicion Tree
+
+## Read and prepare the data
+```{r message=FALSE, warning=FALSE}
+
+#import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(activityCounts)
+library(magrittr)
+library(scales)
+library(caret)
+library(stringr)
+library(MLmetrics)
+library(PRROC)
+library(gridExtra)
+library(kableExtra)
+library(imputeTS)
+library(Beap) # It's not on CRAN yet
+
+
+
+
+
+# ---------------------------- Read the data ----------------------
+
+# set the working directory to the folder that has the raw data and the intervals file
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  main_path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+} else {
+  main_path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+}
+
+# Read the file with x,y,z axis and labels.
+Ethica_df <-
+  fread(paste0(main_path,"/Ethica_Jaeger_Merged/pocket/All_participants_pocket_with_count_for_Weka.csv"))
+
+
+# ---------------------------- Prepare the data ----------------------------
+
+# Participants 112 , 121 .122 , and 132 are not properly classified
+working_df  <-
+  Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
+
+# Model A_1 only uses raw accel data
+working_df %<>%  dplyr::select(c(x_axis, y_axis, z_axis, height, weight, age,gender, x, y, z, trimmed_activity))
+working_df  %<>% filter(trimmed_activity != "transit")
+
+# models canot work with strin
+working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
+  factor(
+    levels = c(
+      "Lying",
+      "Sitting",
+      "Self_Pace_walk",
+      "Running_3_METs",
+      "Running_5_METs",
+      "Running_7_METs"
+    ))
+
+
+```
+
+Note that we need to exclude Participants number 112 , 121 .122 , and 132 as they are not properly classified. Also, to save time, we run the models on 2 percent of the data. Check the code for more details.
+
+
+
+## Generate new features
+We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_axis`, `y_axis`, and `z_axis`. Then we apply the models. The window is set to 2 seconds.
+
+
+```{r message=FALSE, warning=FALSE}
+frequency <- 30
+window_size_sec <- 2
+# The number of features reduces by this
+reduction_coef <-  window_size_sec *frequency 
+new_features_df <- GenerateFeatures(raw_df = working_df, window_size_sec = window_size_sec, frequency = frequency)
+
+# Model A-5 doesn't use x_axis, y_axis, z_axis
+working_df %<>%  dplyr::select(-c(x_axis, y_axis, z_axis))
+
+
+# Increase the frequency
+new_features_df <- new_features_df[rep(1:nrow(new_features_df) , each = reduction_coef), ]
+
+
+# reduce the size of working_df to add new_features
+working_df  %<>% slice(1:nrow(new_features_df))
+## model A-4 uses new_features too
+working_df <- bind_cols(working_df,new_features_df)
+# some models cannpt train if there is any NA
+working_df  %<>% na_interpolation(option =  "linear")
+
+
+```
+
+
+## Apply models
+```{r message=FALSE, warning=FALSE}
+results <-
+    Beap::ApplyModels(
+        working_df = working_df,
+        model_names = c("RF", "LDA", "NB", "SVM", "KNN", "DT"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
+        split_ratio = 0.7,
+        shrink = 0.02,
+        return_plots = TRUE,
+        save_results = FALSE
+    )
+
+
+```
+
+## Compare the results
+
+
+
+```{r message=FALSE, warning=FALSE}
+# Uncomment if need to plot several plot in one image
+# p_LDA <- results$Plots["LDA"]$LDA
+# p_RF <- results$Plots["RF"]$RF
+#grid.arrange(p_LDA, p_RF, ncol=1)
+print(results$Plots)
+
+results$`Model-Accuracy` %>%
+    kable(label = " Accuracy for each model") %>%
+    kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
+```
+
