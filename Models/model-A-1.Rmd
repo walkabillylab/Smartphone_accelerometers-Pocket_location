@@ -72,9 +72,19 @@ working_df  <-
 working_df %<>%  dplyr::select(c(x_axis, y_axis, z_axis, trimmed_activity))
 working_df  %<>% filter(trimmed_activity != "transit")
 
+
 # models canot work with strin
 working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
-  factor()
+  factor(
+    levels = c(
+      "Lying",
+      "Sitting",
+      "Self_Pace_walk",
+      "Running_3_METs",
+      "Running_5_METs",
+      "Running_7_METs"
+    )
+  )
 
 
 ```
@@ -88,7 +98,7 @@ results <-
         working_df = working_df,
         model_names = c("RF", "LDA", "NB", "SVM", "KNN", "DT"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
         split_ratio = 0.7,
-        shrink = 0.02,
+        shrink = 0.01,
         return_plots = TRUE,
         save_results = FALSE
     )
@@ -111,6 +121,13 @@ results$`Model-Accuracy` %>%
     kable(label = " Accuracy for each model") %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
     
+
+```
+
+```{r}
+p_RF <- results$Plots["RF"]$RF
+print(p_RF)
+p_RF + ggplo
 
 ```
 

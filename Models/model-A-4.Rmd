@@ -75,7 +75,15 @@ working_df  %<>% filter(trimmed_activity != "transit")
 
 # models canot work with strin
 working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
-  factor()
+  factor(
+    levels = c(
+      "Lying",
+      "Sitting",
+      "Self_Pace_walk",
+      "Running_3_METs",
+      "Running_5_METs",
+      "Running_7_METs"
+    ))
 
 
 ```

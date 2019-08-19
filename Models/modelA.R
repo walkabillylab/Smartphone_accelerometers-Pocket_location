@@ -537,3 +537,18 @@ if (plot) {
         theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
         ggtitle(model_name)
 }
+
+
+
+labels <- Freq
+
+
+## Ploting
+cf_m <- results[["LDA"]][["cf_matrix"]]
+cf_m$table%>%
+  data.frame() %>%
+  ggplot(aes(Prediction, Reference)) +
+  geom_tile(aes(fill = Freq), colour = "gray50" ) +
+  scale_fill_gradient(low = "beige", high = muted("chocolate")) +
+  geom_text(aes(label = Freq))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
