@@ -12,15 +12,14 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Linear imputation, X,Y,Z,metadata, Counts, and new features
+## Linear imputation, Counts,metadata 
 
-In this markdown, we use the linear imputed data. **X, Y, Z-axis, metada, `counts` and new features** variables are used for this model. We read the CSV file which contains x,y and z `Counts` and then apply the following models using the `ApplyModels` function from `BEAP` package:
+In this markdown, we use the linear imputed data. **metada, `counts`** variables are used for this model. We read the CSV file which contains x,y and z `Counts` and can then apply the following models using the `ApplyModels` function from `BEAP` package:
 
 - `RF`, Random Forest
 - `LDA`, Linear Discriminant Analysis
 - `NB`, Naive Bayes
 - `KNN`, k-Nearest Neighbors
-- `SVM`, Support Vector Machines
 - `DT`, desicion Tree
 
 ## Read and prepare the data
@@ -40,6 +39,7 @@ library(PRROC)
 library(gridExtra)
 library(kableExtra)
 library(imputeTS)
+library(doParallel)
 library(Beap) # It's not on CRAN yet
 
 
@@ -70,8 +70,9 @@ working_df  <-
   Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
 
 # Model A_1 only uses raw accel data
-working_df %<>%  dplyr::select(c(x_axis, y_axis, z_axis, height, weight, age,gender, x, y, z, trimmed_activity))
+working_df %<>%  dplyr::select(c( height, weight, age,gender, x, y, z, trimmed_activity))
 working_df  %<>% filter(trimmed_activity != "transit")
+
 
 # models canot work with strin
 working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
@@ -83,40 +84,20 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
       "Running_3_METs",
       "Running_5_METs",
       "Running_7_METs"
-    ))
+    )
+  )
+# To reduce the frequency
+working_df  %<>% groupdata2::group(n = 30, method = "greedy") %>%
+  rename("id" = .groups)
+working_df  %<>% group_by(id) %>%
+  summarise_all(first) %>%
+  select(-id)
 
 
 ```
 
-Note that we need to exclude Participants number 112 , 121 .122 , and 132 as they are not properly classified. Also, to save time, we run the models on 2 percent of the data. Check the code for more details.
+Note that we need to exclude Participants number 112 , 121 .122 , and 132 as they are not properly classified. Also, to save time, we run the models on some of the data. Check the code for more details.
 
-
-
-## Generate new features
-We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_axis`, `y_axis`, and `z_axis`. Then we apply the models. The window is set to 2 seconds.
-
-
-```{r message=FALSE, warning=FALSE}
-frequency <- 30
-window_size_sec <- 2
-# The number of features reduces by this
-reduction_coef <-  window_size_sec *frequency 
-new_features_df <- GenerateFeatures(raw_df = working_df, window_size_sec = window_size_sec, frequency = frequency)
-
-
-# Increase the frequency
-new_features_df <- new_features_df[rep(1:nrow(new_features_df) , each = reduction_coef), ]
-
-
-# reduce the size of working_df to add new_features
-working_df  %<>% slice(1:nrow(new_features_df))
-## model A-4 uses new_features too
-working_df <- bind_cols(working_df,new_features_df)
-# some models cannpt train if there is any NA
-working_df  %<>% na_interpolation(option =  "linear")
-
-
-```
 
 
 ## Apply models
@@ -124,9 +105,9 @@ working_df  %<>% na_interpolation(option =  "linear")
 results <-
     Beap::ApplyModels(
         working_df = working_df,
-        model_names = c("RF", "LDA", "NB", "SVM", "KNN", "DT"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
+        model_names = c("RF"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
         split_ratio = 0.7,
-        shrink = 0.02,
+        shrink = 1,
         return_plots = TRUE,
         save_results = FALSE
     )
@@ -145,7 +126,8 @@ results <-
 #grid.arrange(p_LDA, p_RF, ncol=1)
 print(results$Plots)
 
-results$`Model-Accuracy` %>%
+results$`Model-Accuracy` %>%  
+  select(Accuracy, AUC, prAUC ) %>% 
     kable(label = " Accuracy for each model") %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
 ```

@@ -132,3 +132,102 @@ fwrite(x = final_df,file = "Ethica_imputed_combined.csv")
 ```
 
 
+
+#### Special imputation methos
+Here we use the special method from `Beap` package for imutation and we focus only on the pocket loaction.
+```{r eval= FALSE}
+
+#import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(activityCounts)
+library(imputeTS)
+library(Beap)
+
+
+##-------------------------------------The root folder---------------------------------##
+# set the working directory to the folder that has the raw data and the intervals file
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  main_path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica"
+} else {
+  main_path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data/Ethica"
+}
+setwd(dir = main_path)
+
+
+#read intervals file to get the participants ids
+participant_list <- fread("intervals.csv")
+
+# for participants 100 to 107, 110, 135, and 148 there is no Jaeger data. Also, Ethica data is not available in 2018
+# so use participats 108, 109 , 111 to 159
+
+
+participant_list <-
+  participant_list %>%  na.omit() %>% slice((9:59)) %>% slice(c(-3,-28,-41)) %>% select(userid)
+
+# create a list of possible wear locations, For now we only use the pocket location
+wear_locations <- c("pock")
+
+# create a dataset to store all the final data
+final_df <- NULL
+
+# Read Ethica files, impute each one of them, and then bind them
+participant_list$userid %>% map(function(participant_id) {
+  wear_locations %>%  map(function(wear_loc) {
+    # create Ethica file name a based on wear_loc and participant_id
+    Ethica_file_name <<-
+      paste0(participant_id, "/", participant_id, "_", wear_loc, ".csv")
+    
+    # read and convert to datetime
+    working_df <- fread(Ethica_file_name)
+    working_df$record_time <-
+      working_df$record_time %>% as_datetime()
+    
+    ##---------status---------------#
+    print(paste0(Ethica_file_name," is read"))
+    
+    ## Create a dataframe with the same staring and end point as the data
+    longer_df <-
+      seq(
+        first(working_df$record_time),
+        last(working_df$record_time),
+        by = period(num = 0.1, units = "second")
+      ) %>%  as.data.frame()
+    colnames(longer_df) <- "record_time"
+
+    # Join the datasets
+    working_df <-
+      full_join(longer_df, working_df , by = "record_time")
+    
+    
+    # impute NAs by special imputation method fron Beap package
+    working_df <- working_df %>%
+      Beap::Impute(time_period_length = 40, k = 3)
+    
+
+    # #save for each participant
+    # fname <- paste0(participant_id,"_",wear_loc,"_imputed.csv")
+    # fwrite(working_df,file = paste0("Imputed-Special/",fname))
+
+
+    # bind all the data and store in final_df
+    final_df <<- bind_rows(final_df, working_df)
+    
+
+    
+    ##---------status---------------#
+    print(paste0(Ethica_file_name," is added"))
+    
+  })
+
+})
+fwrite(x = final_df,file = "Ethica_pocket_special_imputed_combined.csv")
+
+```
+
+
