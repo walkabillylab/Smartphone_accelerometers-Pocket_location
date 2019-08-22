@@ -97,7 +97,7 @@ working_df  %<>% group_by(id) %>%
 Note that we need to exclude Participants number 112 , 121 .122 , and 132 as they are not properly classified. Also, to save time, we can run the models on some of the data. Check the code for more details.
 
 ## Apply models
-```{r message=FALSE, warning=FALSE}
+```{r message=TRUE, warning=FALSE}
 results <-
     Beap::ApplyModels(
         working_df = working_df,
