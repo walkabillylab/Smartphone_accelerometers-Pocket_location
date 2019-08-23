@@ -177,22 +177,28 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
 
 data <- training_df %>% select(-trimmed_activity) %>% as.matrix()
 labels <- training_df %>% select(trimmed_activity) %>% as.matrix() %>% as.factor() %>% as.integer()
-
-
 labels <- labels - 1
+
+
+
 
 model <- keras_model_sequential()
 set.seed(2020)
-opt <- optimizer_adam( )#clipnorm = 0.1, clipvalue = 10.0)
+opt <- optimizer_adam(clipnorm = 1, clipvalue = 1.0 )#clipnorm = 0.1, clipvalue = 10.0)
 
 # add layers and compile the model
+# input_shape = c(65) is number of columns - 1
 model %>%
-    layer_dense(units = 65, activation = 'relu', input_shape = c(65)) %>%
-    layer_dense(units = 128, activation = 'relu') %>% 
+    layer_dense(units = 65, activation = 'relu', input_shape = c(62)) %>%
+    layer_dense(units = 128) %>% 
+    layer_activation_leaky_relu() %>%
     layer_dense(units = 256, activation = 'relu') %>% 
     layer_dense(units = 256, activation = 'relu') %>% 
-    layer_dense(units = 128, activation = 'relu') %>% 
-    layer_dense(units = 128, activation = 'relu') %>% 
+    layer_dense(units = 256) %>% 
+    layer_activation_leaky_relu() %>%
+    layer_dense(units = 256, activation = 'relu') %>% 
+    layer_dense(units = 128, activation = 'softmax') %>% 
+    layer_dense(units = 64, activation = 'relu') %>% 
     layer_dense(units = 6, activation = 'sigmoid') %>%
     compile(
         optimizer = opt,
@@ -206,11 +212,6 @@ model %>%
 # # Convert labels to categorical one-hot encoding
 one_hot_labels <- to_categorical(labels, num_classes = 6)
 
-
-
-
 # Train the model, iterating on the data in batches of 32 samples
-model %>% fit(data, one_hot_labels, epochs = 4, batch_size = 10)
+model %>% fit(data, one_hot_labels, epochs = 10, batch_size = 10)
 
-
-#keras::predict_classes()
