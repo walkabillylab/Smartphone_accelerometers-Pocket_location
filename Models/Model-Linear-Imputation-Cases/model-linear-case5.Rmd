@@ -119,45 +119,6 @@ working_df  %<>% na_interpolation(option =  "linear")
 ```
 
 
-## reading
-Here we just read the data that is prevously prepared instead of creating the dataset from the beginning
-
-```{r}
-
-library(data.table)
-library(tidyverse)
-library(lubridate)
-library(activityCounts)
-library(magrittr)
-library(scales)
-library(caret)
-library(stringr)
-library(MLmetrics)
-library(PRROC)
-library(gridExtra)
-library(kableExtra)
-library(imputeTS)
-library(Beap) # It's not on CRAN yet
-
-
-
-
-########################## Data preparation ###########################
-# ---------------------------- Read the data ----------------------
-
-# set the working directory to the folder that has the raw data and the intervals file
-OS <- Sys.info()
-if (OS["sysname"] == "Windows") {
-    main_path <-
-        "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
-} else {
-    main_path <-
-        "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
-}
-
-working_df <- fread(paste0(main_path,"/Ethica_Jaeger_Merged/Linear_xyz_counts_feaatures.csv"))
-
-```
 
 
 ## Apply models
