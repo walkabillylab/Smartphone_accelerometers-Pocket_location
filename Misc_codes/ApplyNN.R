@@ -94,15 +94,18 @@ working_df <- bind_cols(working_df,new_features_df)
 working_df  %<>% na_interpolation(option =  "linear")
 
 
-fwrite(working_df, file = paste0(main_path,"/Ethica_Jaeger_Merged/Linear_xyz_counts_feaatures.csv "))
-
 # delete X, Y, Z axis
-working_df %<>%  dplyr::select(-c(x_axis, y_axis, z_axis))
+#working_df %<>%  dplyr::select(-c(x_axis, y_axis, z_axis))
 
 # To reduce the frequency
 ## chose n = 60 
 working_df  %<>% groupdata2::group(n = 60, method = "greedy") %>%
     rename("id" = .groups)
+
+
+backup_df <- working_df
+
+
 working_df  %<>% group_by(id) %>%
     summarise_all(first) %>%
     select(-id)
@@ -130,8 +133,17 @@ working_df$gender  %<>% as.factor() %>% as.integer()
 
 working_df$gender <- working_df$gender -1
 
+
+# splitting and scalling
 training_df <- working_df %>% dplyr::slice(training_indices)
+
 testing_df <- working_df %>% dplyr::slice(-training_indices)
+preProcValues <- preProcess(training_df, method = c("center", "scale"))
+
+training_df <- predict(preProcValues, training_df)
+testing_df <- predict(preProcValues, testing_df)
+
+
 message(paste0("Data is devided into training and test set "))
 message(paste0(
     "Training set has ",
@@ -160,8 +172,6 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
     factor()
 
 
-backup_df <- working_df
-
 
 
 
@@ -173,12 +183,16 @@ labels <- labels - 1
 
 model <- keras_model_sequential()
 set.seed(2020)
-opt <- optimizer_adam( clipnorm = 1, clipvalue = 2.0)
+opt <- optimizer_adam( )#clipnorm = 0.1, clipvalue = 10.0)
 
 # add layers and compile the model
 model %>%
-    layer_dense(units = 100, activation = 'relu', input_shape = c(59)) %>%
-    layer_dense(units = 12, activation = 'relu') %>% 
+    layer_dense(units = 65, activation = 'relu', input_shape = c(65)) %>%
+    layer_dense(units = 128, activation = 'relu') %>% 
+    layer_dense(units = 256, activation = 'relu') %>% 
+    layer_dense(units = 256, activation = 'relu') %>% 
+    layer_dense(units = 128, activation = 'relu') %>% 
+    layer_dense(units = 128, activation = 'relu') %>% 
     layer_dense(units = 6, activation = 'sigmoid') %>%
     compile(
         optimizer = opt,
@@ -196,7 +210,7 @@ one_hot_labels <- to_categorical(labels, num_classes = 6)
 
 
 # Train the model, iterating on the data in batches of 32 samples
-model %>% fit(data, one_hot_labels, epochs = 10, batch_size = 10)
+model %>% fit(data, one_hot_labels, epochs = 4, batch_size = 10)
 
 
 #keras::predict_classes()
