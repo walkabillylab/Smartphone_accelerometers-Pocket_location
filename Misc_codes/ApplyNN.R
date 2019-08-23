@@ -57,8 +57,8 @@ Ethica_df <-
 working_df  <-
     Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
 
-# Model A_1 only uses raw accel data
-working_df %<>%  dplyr::select(c(x_axis, y_axis, z_axis, height, weight, age,gender, trimmed_activity))
+# 
+working_df %<>%  dplyr::select(c(x_axis, y_axis, z_axis,x ,y ,z, height, weight, age,gender, trimmed_activity))
 working_df  %<>% filter(trimmed_activity != "transit")
 
 # models canot work with strin
@@ -93,6 +93,8 @@ working_df <- bind_cols(working_df,new_features_df)
 # some models cannpt train if there is any NA
 working_df  %<>% na_interpolation(option =  "linear")
 
+
+fwrite(working_df, file = paste0(main_path,"/Ethica_Jaeger_Merged/Linear_xyz_counts_feaatures.csv "))
 
 # delete X, Y, Z axis
 working_df %<>%  dplyr::select(-c(x_axis, y_axis, z_axis))

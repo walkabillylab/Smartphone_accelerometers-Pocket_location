@@ -1,5 +1,5 @@
 ---
-title: "Model_A_6"
+title: "Model_B_6"
 author: "Javad Khataei"
 date: "8/16/2019"
 output:

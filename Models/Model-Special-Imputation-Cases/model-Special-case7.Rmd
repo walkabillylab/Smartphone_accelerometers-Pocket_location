@@ -1,5 +1,5 @@
 ---
-title: "Model_A_7"
+title: "Model_B_7"
 author: "Javad Khataei"
 date: "8/16/2019"
 output:
@@ -39,6 +39,8 @@ library(MLmetrics)
 library(PRROC)
 library(gridExtra)
 library(kableExtra)
+library(tictoc)
+library(imputeTS)
 library(Beap) # It's not on CRAN yet
 
 
@@ -92,13 +94,15 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
 We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_axis`, `y_axis`, and `z_axis`. Then we apply the models. The window is set to 2 seconds.
 
 
-```{r message=FALSE, warning=FALSE}
-frequency <- 30
+```{r message = T, warning=FALSE}
+frequency <- 10
 window_size_sec <- 2
-# The number of features reduces by this
-reduction_coef <-  window_size_sec *frequency 
-new_features_df <- GenerateFeatures(raw_df = working_df, window_size_sec = window_size_sec, frequency = frequency)
 
+# The number of features reduces by this
+tictoc::tic("Generating new features took ")
+reduction_coef <-  window_size_sec * frequency 
+new_features_df <- GenerateFeatures(raw_df = working_df, window_size_sec = window_size_sec, frequency = frequency)
+tictoc::toc()
 
 # Increase the frequency
 new_features_df <- new_features_df[rep(1:nrow(new_features_df) , each = reduction_coef), ]
@@ -116,8 +120,8 @@ working_df  %<>% na_interpolation(option =  "linear")
 working_df %<>%  dplyr::select(-c(x_axis, y_axis, z_axis))
 
 # To reduce the frequency
-## chose n = 60 
-working_df  %<>% groupdata2::group(n = 60, method = "greedy") %>%
+n <- frequency *  window_size_sec
+working_df  %<>% groupdata2::group(n = n, method = "greedy") %>%
   rename("id" = .groups)
 working_df  %<>% group_by(id) %>%
   summarise_all(first) %>%
@@ -134,7 +138,7 @@ Note that we need to exclude Participants number 112 , 121 .122 , and 132 as the
 results <-
     Beap::ApplyModels(
         working_df = working_df,
-        model_names = c("RF", "LDA", "NB", "SVM", "KNN", "DT"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
+        model_names = c("RF", "LDA", "NB", "KNN", "DT"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
         split_ratio = 0.7,
         shrink = 1,
         return_plots = TRUE,

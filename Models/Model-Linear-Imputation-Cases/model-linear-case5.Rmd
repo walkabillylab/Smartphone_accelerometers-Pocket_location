@@ -1,5 +1,5 @@
 ---
-title: "Model_A_5"
+title: "Model_B_5"
 author: "Javad Khataei"
 date: "8/16/2019"
 output:
@@ -24,7 +24,7 @@ In this markdown, we use the linear imputed data. **X, Y, Z, metadata, and new f
 - `DT`, desicion Tree
 
 ## Read and prepare the data
-```{r message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE, eval=FALSE}
 
 #import libraries
 library(data.table)
@@ -96,7 +96,7 @@ Note that we need to exclude Participants number 112 , 121 .122 , and 132 as the
 We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_axis`, `y_axis`, and `z_axis`. Then we apply the models. The window is set to 2 seconds.
 
 
-```{r message= T , warning=FALSE}
+```{r message= T , warning=FALSE, eval=FALSE}
 frequency <- 30
 window_size_sec <- 2
 # The number of features reduces by this
@@ -115,6 +115,47 @@ working_df <- bind_cols(working_df,new_features_df)
 # some models cannpt train if there is any NA
 working_df  %<>% na_interpolation(option =  "linear")
 
+
+```
+
+
+## reading
+Here we just read the data that is prevously prepared instead of creating the dataset from the beginning
+
+```{r}
+
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(activityCounts)
+library(magrittr)
+library(scales)
+library(caret)
+library(stringr)
+library(MLmetrics)
+library(PRROC)
+library(gridExtra)
+library(kableExtra)
+library(imputeTS)
+library(Beap) # It's not on CRAN yet
+
+
+
+
+########################## Data preparation ###########################
+# ---------------------------- Read the data ----------------------
+
+# set the working directory to the folder that has the raw data and the intervals file
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+    main_path <-
+        "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+} else {
+    main_path <-
+        "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+}
+
+working_df <- fread(paste0(main_path,"/Ethica_Jaeger_Merged/Linear_xyz_counts_feaatures.csv"))
 
 ```
 

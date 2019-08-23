@@ -39,6 +39,7 @@ library(MLmetrics)
 library(PRROC)
 library(gridExtra)
 library(kableExtra)
+library(imputeTS)
 library(Beap) # It's not on CRAN yet
 
 
@@ -92,7 +93,7 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
 We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_axis`, `y_axis`, and `z_axis`. Then we apply the models. The window is set to 2 seconds.
 
 
-```{r message=FALSE, warning=FALSE}
+```{r message= T , warning=FALSE}
 frequency <- 30
 window_size_sec <- 2
 # The number of features reduces by this
