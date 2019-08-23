@@ -171,7 +171,7 @@ labels <- labels - 1
 
 model <- keras_model_sequential()
 set.seed(2020)
-opt <- optimizer_adam( clipvalue = 2.0)
+opt <- optimizer_adam( clipnorm = 1, clipvalue = 2.0)
 
 # add layers and compile the model
 model %>%
