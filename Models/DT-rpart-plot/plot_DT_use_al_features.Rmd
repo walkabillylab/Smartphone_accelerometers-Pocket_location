@@ -113,7 +113,7 @@ working_df  %<>% na_interpolation(option =  "linear")
 
 
 
-## Model with a DT
+## Model with a DT with rpart and plot it
 ```{r message=TRUE, warning=FALSE}
 # Load rpart and rpart.plot
 library(rpart)
@@ -142,12 +142,12 @@ testing_df <- predict(preProcValues, testing_df)
 message("Data is scaled and centered")
 
 # Create a decision tree model
-tree <- rpart(trimmed_activity ~ ., data = training_df, minsplit = 10, cp = .01) # cp = complexity parameter
+tree <- rpart(trimmed_activity ~ ., data = training_df, minsplit = 10, cp = .005) # cp = complexity parameter
 # Visualize the decision tree with rpart.plot
 rpart.plot(tree,
            box.palette = "RdBu",
            shadow.col = "gray",
-           nn = TRUE,type = 1)
+           nn = T )
 
 testing_df_x <- testing_df %>% select(-trimmed_activity)
 testing_df_y <- testing_df %>% select(trimmed_activity)
@@ -158,20 +158,14 @@ Accuracy(y_pred = pred_testing_y, y_true = testing_df_y)
 
 ```
 
-## Plot the tree
+## Use C50 package to create a DT and plot it
 
-```{r message=FALSE, warning=FALSE}
-# Uncomment if need to plot several plot in one image
-# p_LDA <- results$Plots["LDA"]$LDA
-# p_RF <- results$Plots["RF"]$RF
-#grid.arrange(p_LDA, p_RF, ncol=1)
-print(results$Plots)
-results$`Model-Accuracy` %>%  
-  select(Accuracy, AUC, prAUC ) %>% 
-    kable(label = " Accuracy for each model") %>%
-    kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
- 
-
-
+```{r message=T, warning= T}
+library(C50)
+treeModel <- C5.0(x = training_df[, -11], y = training_df$trimmed_activity)
+treeModel
+summary(treeModel)
+plot(treeModel, subtree = 's94')
+C50::C5imp(treeModel,pct = T)
 ```
 

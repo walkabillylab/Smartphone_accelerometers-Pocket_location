@@ -123,7 +123,7 @@ results <-
 print(results$Plots)
 
 results$`Model-Accuracy` %>%  
-  select(Accuracy, AUC, prAUC, Mean_F1) %>% 
+  select(Accuracy, AUC, prAUC, Mean_F1, Mean_Sensitivity, Mean_Specificity) %>% 
     kable(label = " Accuracy for each model") %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
     
