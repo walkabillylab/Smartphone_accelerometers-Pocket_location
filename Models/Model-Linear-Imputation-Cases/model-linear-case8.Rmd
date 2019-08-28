@@ -78,9 +78,7 @@ working_df %<>%  dplyr::select(c(
   weight,
   age,
   gender,
-  x,
-  y,
-  z,
+  Counts_vec_mag,
   trimmed_activity
 ))
 working_df  %<>% filter(trimmed_activity != "transit")

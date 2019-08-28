@@ -70,7 +70,7 @@ working_df  <-
   Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
 
 # Model A_1 only uses raw accel data
-working_df %<>%  dplyr::select(c( height, weight, age,gender, x, y, z, trimmed_activity))
+working_df %<>%  dplyr::select(c( height, weight, age,gender, Counts_vec_mag, trimmed_activity))
 working_df  %<>% filter(trimmed_activity != "transit")
 
 

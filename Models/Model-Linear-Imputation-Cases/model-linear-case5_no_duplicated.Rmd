@@ -1,5 +1,5 @@
 ---
-title: "Model_A_2"
+title: "Model_A_5"
 author: "Javad Khataei"
 date: "8/16/2019"
 output:
@@ -12,9 +12,9 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Linear imputation, Counts
+## Linear imputation, X, Y, Z, metadata, and new features
 
-In this markdown, we use the linear imputed data. **Counts** variables are used for this model. We can apply the following models using the `ApplyModels` function from `BEAP` package:
+In this markdown, we use the linear imputed data. **X, Y, Z, metadata, and new features** variables are used for this model. We read the CSV file which contains x,y and z `Counts` and then we can apply the following models using the `ApplyModels` function from `BEAP` package:
 
 - `RF`, Random Forest
 - `LDA`, Linear Discriminant Analysis
@@ -39,7 +39,7 @@ library(MLmetrics)
 library(PRROC)
 library(gridExtra)
 library(kableExtra)
-library(groupdata2) 
+library(imputeTS)
 library(Beap) # It's not on CRAN yet
 
 
@@ -70,7 +70,7 @@ working_df  <-
   Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
 
 # Model A_1 only uses raw accel data
-working_df %<>%  dplyr::select(c(Counts_vec_mag, trimmed_activity))
+working_df %<>%  dplyr::select(c(x_axis, y_axis, z_axis, height, weight, age,gender, trimmed_activity))
 working_df  %<>% filter(trimmed_activity != "transit")
 
 # models canot work with strin
@@ -85,16 +85,52 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
       "Running_7_METs"
     ))
 
-# To reduce the frequency 
-working_df  %<>% groupdata2::group(n = 30, method = "greedy") %>%
-  rename( "id" = .groups )
-working_df  %<>% group_by(id) %>%
-  summarise(x = first(x) , y =  first(y) , z = first(z) , trimmed_activity= first(trimmed_activity)) %>% 
-  select(-id)
 
 ```
 
-Note that we need to exclude Participants number 112 , 121 .122 , and 132 as they are not properly classified. Also, to save time, we can run the models on some of the data. Check the code for more details.
+Note that we need to exclude Participants number 112 , 121 .122 , and 132 as they are not properly classified. Also, to save time, we run the models on  some of the data. Check the code for more details.
+
+
+
+## Generate new features
+We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_axis`, `y_axis`, and `z_axis`. Then we apply the models. The window is set to 2 seconds.
+
+
+```{r message= T , warning=FALSE}
+frequency <- 30
+window_size_sec <- 2
+# The number of features reduces by this
+reduction_coef <-  window_size_sec *frequency 
+new_features_df <- GenerateFeatures(raw_df = working_df, window_size_sec = window_size_sec, frequency = frequency)
+
+
+# Increase the frequency
+new_features_df <- new_features_df[rep(1:nrow(new_features_df) , each = reduction_coef), ]
+
+
+# reduce the size of working_df slightly to add new_features
+working_df  %<>% slice(1:nrow(new_features_df))
+## model uses new_features too
+working_df <- bind_cols(working_df,new_features_df)
+# some models cannpt train if there is any NA
+working_df  %<>% na_interpolation(option =  "linear")
+
+
+```
+
+## New section- Removing duplicates
+Having duplicated values can affect the accuracy and results in false high accuracy.
+
+```{r}
+working_df  %<>% groupdata2::group(n = 3, method = "greedy") %>%
+    rename("id" = .groups)
+working_df  %<>% group_by(id) %>%
+    summarise_all(first) %>%
+    select(-id)
+
+```
+
+
 
 ## Apply models
 ```{r message=TRUE, warning=FALSE}
@@ -103,12 +139,11 @@ results <-
         working_df = working_df,
         model_names = c("RF"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
         split_ratio = 0.7,
+        scale_center = T,
         shrink = 1,
         return_plots = TRUE,
         save_results = FALSE
     )
-
-
 ```
 
 ## Compare the results
@@ -121,12 +156,10 @@ results <-
 # p_RF <- results$Plots["RF"]$RF
 #grid.arrange(p_LDA, p_RF, ncol=1)
 print(results$Plots)
-
 results$`Model-Accuracy` %>%  
   select(Accuracy, AUC, prAUC, Mean_F1, Mean_Sensitivity, Mean_Specificity) %>% 
-    kable(label = " Accuracy for each model") %>%
+    kable(label = "Accuracy for each model") %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
-    
-
+ 
 ```
 

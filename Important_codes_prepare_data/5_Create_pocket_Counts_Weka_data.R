@@ -48,7 +48,7 @@ working_df$record_time <- working_df$record_time %>%  as_datetime()
 # deselect some Jaeger columns
 working_df  %<>% select(-c(7:16))
 
-# convert accel data to normal data (unit was g)
+# convert accel data to normal data (unit was g) coz activitycounts need normal data
 working_df[,2:4] <- working_df[,2:4] / 9.808
 
 # save for Weka
@@ -78,13 +78,17 @@ par_list  %>% map(function(p_id){
   start_time <- working_df$record_time %>%  first() %>%  as_datetime()
   
   
-  # Calculate counts
+  # Calculate counts then vector magnitude 
   counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
   colnames(counts)[1] <- "record_time"
+  mag <- function(x,y,z) {
+    return(sqrt(x^2+y^2+z^2))
+  }
   
-  
+  counts  %<>% mutate(Counts_vec_mag = mag(counts$x, counts$y, counts$z)) %>% select(record_time, Counts_vec_mag)
+
   #Join with the raw data and impute 
-  working_df  %<>% full_join(.,counts) %>% fill(x, y, z)
+  working_df  <- full_join(working_df,counts , by = "record_time") %>% fill(Counts_vec_mag)
   
   
   # delete transit

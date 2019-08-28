@@ -1,0 +1,171 @@
+---
+title: "Features Summary"
+author: "Javad Khataei"
+date: "8/28/2019"
+output:
+    html_document:
+        code_folding : hide
+        toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this markdown, we use **x_axis, y_axis, z_axis** variables to created new features and then we have a look at the **Mean** and **Standard devation** of the features. 
+
+## Generating Features
+
+### Read and prepare the data
+```{r message=FALSE, warning=FALSE}
+
+#import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(activityCounts)
+library(magrittr)
+library(scales)
+library(caret)
+library(stringr)
+library(MLmetrics)
+library(PRROC)
+library(gridExtra)
+library(kableExtra)
+library(imputeTS)
+library(Beap) # It's not on CRAN yet
+
+
+
+
+
+# ---------------------------- Read the data ----------------------
+
+# set the working directory to the folder that has the raw data and the intervals file
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  main_path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+} else {
+  main_path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+}
+
+# Read the file with x,y,z axis and labels.
+Ethica_df <-
+  fread(paste0(main_path,"/Ethica_Jaeger_Merged/pocket/All_participants_pocket_with_count_for_Weka.csv"))
+
+
+# ---------------------------- Prepare the data ----------------------------
+
+# Participants 112 , 121 .122 , and 132 are not properly classified
+working_df  <-
+  Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
+
+# select everything for comparision
+working_df %<>%  dplyr::select(c(participant_id, x_axis, y_axis, z_axis, Counts_vec_mag, height, weight, age,gender, trimmed_activity))
+working_df  %<>% filter(trimmed_activity != "transit")
+
+# models canot work with strin
+working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
+  factor(
+    levels = c(
+      "Lying",
+      "Sitting",
+      "Self_Pace_walk",
+      "Running_3_METs",
+      "Running_5_METs",
+      "Running_7_METs"
+    ))
+
+
+```
+
+Note that we need to exclude Participants number 112 , 121 .122 , and 132 as they are not properly classified. Also, to save time, we run the models on  some of the data. Check the code for more details.
+
+
+
+### Generate new features
+We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_axis`, `y_axis`, and `z_axis`. Then we apply the models. The window is set to 2 seconds.
+
+
+```{r message= T , warning=FALSE}
+frequency <- 30
+window_size_sec <- 2
+# The number of features reduces by this
+reduction_coef <-  window_size_sec *frequency 
+new_features_df <- GenerateFeatures(raw_df = working_df, window_size_sec = window_size_sec, frequency = frequency)
+
+
+# Increase the frequency
+new_features_df <- new_features_df[rep(1:nrow(new_features_df) , each = reduction_coef), ]
+
+
+# reduce the size of working_df to add new_features
+working_df  %<>% slice(1:nrow(new_features_df))
+## model A-4 uses new_features too
+working_df <- bind_cols(working_df,new_features_df)
+# some models cannpt train if there is any NA
+working_df  %<>% na_interpolation(option =  "linear")
+
+
+```
+
+
+
+## Calculated Mean for each participant
+
+```{r message=FALSE, warning=FALSE}
+working_df %>% group_by(participant_id) %>% 
+    select(-c(gender,trimmed_activity)) %>% 
+    summarise_all(mean) %>%  
+    kable(label = " Features mean for each participant") %>%
+    kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) %>% 
+    scroll_box(width = "100%", height = "600px")
+ 
+```
+## Calculated SD for each participant 
+
+```{r message=FALSE, warning=FALSE}
+working_df %>% group_by(participant_id) %>% 
+        select(-c(gender,trimmed_activity)) %>% 
+    summarise_all(sd) %>%  
+    kable(label = " Features SD for each participant") %>%
+    kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) %>% 
+    scroll_box(width = "100%", height = "600px")
+ 
+```
+
+## Calculated Mean for all 
+
+```{r message=FALSE, warning=FALSE}
+working_df %>% 
+    select(-c(gender,trimmed_activity)) %>% 
+    summarise_all(mean) %>%  
+    kable(label = " Features mean for all participant") %>%
+    kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) %>% 
+    scroll_box(width = "100%", height = "600px")
+ 
+```
+## Calculated SD for all 
+
+```{r message=FALSE, warning=FALSE}
+working_df %>% 
+        select(-c(gender,trimmed_activity)) %>% 
+    summarise_all(sd) %>%  
+    kable(label = " Features SD for al participant") %>%
+    kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) %>% 
+    scroll_box(width = "100%", height = "600px")
+ 
+```
+# Plot Mean for all
+```{r}
+working_df %>% select(-c(gender,trimmed_activity)) %>% 
+  summarise_all(mean) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin() +
+  geom_boxplot(width=0.1)
+
+```
+
