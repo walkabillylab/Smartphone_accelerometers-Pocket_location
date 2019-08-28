@@ -97,9 +97,10 @@ Note that we need to exclude Participants number 112 , 121 .122 , and 132 as the
 results <-
     Beap::ApplyModels(
         working_df = working_df,
-        model_names = c("RF", "LDA", "NB",  "KNN", "DT"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
-        split_ratio = 0.7,
-        shrink = .02,
+        model_names = c("KNN"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
+        cv_folds = 10,
+        split_ratio = 0.90,
+        shrink = .01,
         return_plots = TRUE,
         save_results = FALSE
     )

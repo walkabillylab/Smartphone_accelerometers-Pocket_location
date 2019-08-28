@@ -12,9 +12,9 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Linear imputation, X,Y,Z, and Counts
+## Linear imputation, X,Y,Z, Counts, and metadata
 
-In this markdown, we use the linear imputed data. **X,Y,Z, and Counts** variables are used for this model. We apply the following models using the `ApplyModels` function from `BEAP` package:
+In this markdown, we use the linear imputed data. **X,Y,Z, Counts and metadata** variables are used for this model. We apply the following models using the `ApplyModels` function from `BEAP` package:
 
 - `RF`, Random Forest
 - `LDA`, Linear Discriminant Analysis
@@ -69,8 +69,20 @@ Ethica_df <-
 working_df  <-
   Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
 
-# Model A_1 only uses raw accel data
-working_df %<>%  dplyr::select(c(x_axis, y_axis, z_axis, x, y, z, trimmed_activity))
+# select the features based on the model
+working_df %<>%  dplyr::select(c(
+  x_axis,
+  y_axis,
+  z_axis,
+  height,
+  weight,
+  age,
+  gender,
+  x,
+  y,
+  z,
+  trimmed_activity
+))
 working_df  %<>% filter(trimmed_activity != "transit")
 
 
@@ -98,6 +110,7 @@ results <-
     Beap::ApplyModels(
         working_df = working_df,
         model_names = c("RF"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
+        scale_center = T,
         split_ratio = 0.7,
         shrink = 1,
         return_plots = TRUE,
@@ -119,6 +132,7 @@ results <-
 print(results$Plots)
 
 results$`Model-Accuracy` %>%
+  select(Accuracy, AUC, prAUC, Mean_F1) %>% 
     kable(label = " Accuracy for each model") %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
     
