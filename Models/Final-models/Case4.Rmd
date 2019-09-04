@@ -9,7 +9,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE , eval = T)
 ```
 
 ## Linear imputation, Counts(x,y,z,vec_mag) and its features
@@ -25,7 +25,7 @@ In this markdown, we use the linear imputed data. Only **Counts(x,y,z,vec_mag) a
 
  
 ## Read and prepare the data
-```{r message=FALSE, warning=FALSE}
+```{r readData, message=FALSE, warning=FALSE}
 
 #import libraries
 library(data.table)
@@ -106,7 +106,7 @@ Note that we need to exclude Participants number 112 , 121 .122 , and 132 as the
 We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_counts`, `y_counts`, and `z_counts`. Then we apply the models. The window is set to 2 seconds.
 
 
-```{r message= T , warning=FALSE}
+```{r generateFeatures, message= T , warning=FALSE}
 frequency <- 1 # freq of new data which is counts not raw x,y,z axis
 window_size_sec <- 2
 # The number of features reduces by this
@@ -148,7 +148,7 @@ working_df %<>%  select(-c(29, 30, 31, 32, 33, 34, 35, 36, 37))
 ## Remove features based on feature importance
 Here we delete the features which have zero effect on the results. We get this features by running RF on the the data and calculating feature importance. 
 
-```{r}
+```{r trimFeatures}
 working_df %<>%  select(-c(
 acf_x,
 acf_y,
@@ -164,11 +164,11 @@ krt_z))
 
 
 ## Apply models
-```{r message=TRUE, warning=FALSE}
+```{r applyModels,message=TRUE, warning=FALSE}
 results <-
     Beap::ApplyModels(
         working_df = working_df,
-        model_names =c("LDA" , "RF", "NB"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
+        model_names =c("LDA" , "RF"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
         split_ratio = 0.7,
         shrink = 1,
         return_plots = TRUE,
@@ -182,7 +182,7 @@ results <-
 ## Compare the results
 
 
-```{r message=FALSE, warning=FALSE}
+```{r showResults, message=FALSE, warning=FALSE}
 print(results$Plots)
 
 results$`Model-Accuracy` %>%  
@@ -196,7 +196,7 @@ results$`Model-Accuracy` %>%
 
 ### Feature importance for RF
 
-```{r}
+```{r featureImp}
 
 
 imp_table <- results$RF_Feature_Importance$importance
