@@ -140,18 +140,16 @@ working_df %>% group_by(participant_id) %>%
  
 ```
 
+## Calculated Mean for all 
 
-# Plot Mean 
-```{r}
-working_df %>% select(5:40) %>% #, participant_id
- # summarise_all(mean) %>% 
-  stack() %>% 
-  ggplot(aes(x = ind, y = values)) +
-  geom_violin(scale = "width") +
-  geom_boxplot(width=0.1)
-
+```{r message=FALSE, warning=FALSE}
+working_df %>% 
+    select(-c(participant_id, trimmed_activity)) %>% 
+    summarise_all(mean) %>%  
+    kable(label = " Features mean for all participant") %>%
+    kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) 
+ 
 ```
-
 
 
 
@@ -160,7 +158,7 @@ working_df %>% select(5:40) %>% #, participant_id
 
 ```{r message=FALSE, warning=FALSE}
 working_df %>% group_by(participant_id) %>% 
-        select(-c(gender,trimmed_activity)) %>% 
+        select(-c(trimmed_activity)) %>% 
     summarise_all(sd) %>%  
     kable(label = " Features SD for each participant") %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) %>% 
@@ -168,26 +166,141 @@ working_df %>% group_by(participant_id) %>%
  
 ```
 
-## Calculated Mean for all 
+As it is shown above, nine features, do not have any standard deviation, meaning they are constant. We confirm this by calcutaing SD for all the participants. 
 
-```{r message=FALSE, warning=FALSE}
-working_df %>% 
-    select(-c(gender,trimmed_activity)) %>% 
-    summarise_all(mean) %>%  
-    kable(label = " Features mean for all participant") %>%
-    kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) 
- 
-```
+
+
 ## Calculated SD for all 
 
 ```{r message=FALSE, warning=FALSE}
 working_df %>% 
-        select(-c(gender,trimmed_activity)) %>% 
+        select(-c(participant_id,trimmed_activity)) %>% 
     summarise_all(sd) %>%  
     kable(label = " Features SD for al participant") %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) 
  
 ```
+
+We need to eliminate these features in final Case 4 as they don't carry any usable information.
+
+
+# Plot Mean 
+```{r}
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  select(1:5) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  select(6:10) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  select(11:15) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  select(16:20) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  select(21:25) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  select(26:30) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  select(31:35) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  select(36:40) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  select(41:45) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  select(46:50) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  select(51:55) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  select(56:59) %>% 
+  stack() %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+
+
+```
+```{r eval=FALSE, include=FALSE}
+
+size <- nrow(working_df) * 5 # plotting 5 variables in each graph
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  stack() %>% groupdata2::group(n = size, method = "greedy") %>%
+  rename("id" = .groups) %>%  group_by(id) %>% 
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1)
+
+```
+
 
 
 
@@ -209,14 +322,14 @@ Mean_SD <- function(x) { # a function to calculate mean and SD and return them t
 }
 
 mean_sd_all_df <- working_df %>% 
-    select(-c(gender, participant_id, trimmed_activity)) %>% 
+    select(-c(  participant_id, trimmed_activity)) %>% 
     summarise_all(Mean_SD) %>%
   data.table::transpose() 
 
 colnames(mean_sd_all_df) <- "Grand Mean (SD)"
 
 table_df <- working_df %>% group_by(trimmed_activity) %>% 
-    select(-c(gender, participant_id)) %>% 
+    select(-c(  participant_id)) %>% 
     summarise_all(Mean_SD)
 
 col_names <- table_df$trimmed_activity %>% as.character()
