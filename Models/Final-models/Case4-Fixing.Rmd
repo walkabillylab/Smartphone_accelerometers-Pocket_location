@@ -1,5 +1,5 @@
 ---
-title: "Case 3 "
+title: "Case 4"
 author: "Javad Khataei"
 date: "8/29/2019"
 output:
@@ -9,12 +9,12 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE , eval = T)
 ```
 
-## Linear imputation, X, Y, Z axis, and Features
+## Linear imputation, Counts(x,y,z,vec_mag) and its features
 
-In this markdown, we use the linear imputed data. Only **X, Y, and Z-axis and Features** variables are used for this model. We can apply the following models using the `ApplyModels` function from `BEAP` package:
+In this markdown, we use the linear imputed data. Only **Counts(x,y,z,vec_mag) and its features** variables are used for this model. We can apply the following models using the `ApplyModels` function from `BEAP` package:
 
 - `RF`, Random Forest
 - `LDA`, Linear Discriminant Analysis
@@ -25,7 +25,7 @@ In this markdown, we use the linear imputed data. Only **X, Y, and Z-axis and Fe
 
  
 ## Read and prepare the data
-```{r message=FALSE, warning=FALSE}
+```{r readData, message=FALSE, warning=FALSE}
 
 #import libraries
 library(data.table)
@@ -71,7 +71,7 @@ working_df  <-
   Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
 
 # Model A_1 only uses raw accel data
-working_df %<>%  dplyr::select(c(x_axis, y_axis, z_axis, trimmed_activity))
+working_df %<>%  dplyr::select(c(x, y, z, counts_vec_mag, trimmed_activity))
 working_df  %<>% filter(trimmed_activity != "transit")
 
 
@@ -89,49 +89,91 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
   )
 
 
+# We need to delete NAs, each 10 observation has one counts
+freq <- 10
+working_df  %<>% groupdata2::group(n = freq, method = "greedy") %>%
+  rename( "id" = .groups )
+working_df  %<>% group_by(id) %>%
+  summarise(x = max(x, na.rm = T),
+            y = max(y, na.rm = T),
+            z = max(z, na.rm = T),
+            counts_vec_mag = first(counts_vec_mag),
+            trimmed_activity= first(trimmed_activity)) %>% 
+  select(-id)
+
+# or use this : 
+#working_df  %<>% na.omit()
+
+
 ```
 
 Note that we need to exclude Participants number 112 , 121 .122 , and 132 as they are not properly classified. 
 
-# Add new features
 
-```{r message= F , warning=FALSE}
-frequency <- 10
-window_size_sec <- 2
+## Generate new features
+We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_counts`, `y_counts`, and `z_counts`. Then we apply the models. The window is set to 10 seconds.
+
+
+```{r generateFeatures, message= T , warning=FALSE}
+frequency <- 1 # freq of new data which is counts not raw x,y,z axis
+window_size_sec <- 10
 # The number of features reduces by this
 reduction_coef <-  window_size_sec * frequency
 new_features_df <-
   GenerateFeatures(raw_df = working_df,
                    window_size_sec = window_size_sec,
-                   frequency = frequency) #%>%
-  #dplyr::select(-c("dfr_x", "dfr_y", "dfr_z")) # Eliminates outliers ,i.e. ("dfr_x", "dfr_y", "dfr_z")
+                   frequency = frequency) 
 
 
-# Increase the frequency
-new_features_df <-
-  new_features_df[rep(1:nrow(new_features_df) , each = reduction_coef),]
+
+labels <- working_df %>%
+      select(trimmed_activity) %>%
+      zoo::rollapply(
+        data = .,
+        width = (window_size_sec * frequency),
+        by = (window_size_sec * frequency),
+        FUN = first
+          ) %>%
+      as.data.frame()
 
 
-# reduce the size of working_df to add new_features
-working_df  %<>% slice(1:nrow(new_features_df))
-##  
-working_df <- bind_cols(working_df, new_features_df)
+
+working_df <- bind_cols(labels, new_features_df)
 # some models cannpt train if there is any NA
 working_df  %<>% na_interpolation(option =  "linear")
 
 ```
 
+<!-- ## Remove features based on feature importance -->
+<!-- Here we delete the features which have zero effect on the results. We get this features by running RF on the the data and calculating feature importance.  -->
+
+<!-- ```{r trimFeatures} -->
+<!-- working_df %<>%  select(-c( -->
+<!-- acf_x, -->
+<!-- acf_y, -->
+<!-- acf_z, -->
+<!-- skw_x, -->
+<!-- skw_y, -->
+<!-- skw_z, -->
+<!-- krt_x, -->
+<!-- krt_y, -->
+<!-- krt_z)) -->
+
+<!-- ``` -->
+
 
 ## Apply models
-```{r message=TRUE, warning=FALSE}
+```{r applyModels,message=TRUE, warning=FALSE}
 results <-
     Beap::ApplyModels(
         working_df = working_df,
-        model_names =c("RF"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
+        model_names =c("LDA", "RF"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
         split_ratio = 0.7,
-        shrink = 0.05,
+        shrink = 1,
         return_plots = TRUE,
-        save_results = FALSE
+        save_results = FALSE,
+        scale_center = FALSE,
+        RF_mtry = 1
     )
 ```
 
@@ -140,22 +182,21 @@ results <-
 ## Compare the results
 
 
-```{r message=FALSE, warning=FALSE}
+```{r showResults, message=FALSE, warning=FALSE}
 print(results$Plots)
 
 results$`Model-Accuracy` %>%  
   select(Accuracy, AUC, prAUC, Mean_F1, Mean_Sensitivity, Mean_Specificity) %>% 
-  round(digits = 4) %>% 
+  round(digits = 3) %>% 
     kable(label = " Accuracy for each model") %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
- 
-
-#save(results, "Case3_reults.RData")
+     
+#save(results, "Case4_reults.RData")
 ```
 
 ### Feature importance for RF
 
-```{r}
+```{r featureImp}
 
 
 imp_table <- results$RF_Feature_Importance$importance
@@ -168,4 +209,5 @@ imp_table  %>% data.frame(row_names, .) %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
 
 ```
+
 
