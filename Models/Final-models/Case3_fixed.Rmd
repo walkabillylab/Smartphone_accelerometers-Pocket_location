@@ -12,6 +12,8 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
+In this file we try to fix the high accuracy problem. I think having repeated values are the main problem. We have many feature(+60) and we repeated rows many times and this rows are almost identical( only different in 3 features). This produced high accuracy as the model has seen most of the data before.
 ## Linear imputation, X, Y, Z axis, and Features
 
 In this markdown, we use the linear imputed data. Only **X, Y, and Z-axis and Features** variables are used for this model. We can apply the following models using the `ApplyModels` function from `BEAP` package:
@@ -94,10 +96,10 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
 Note that we need to exclude Participants number 112 , 121 .122 , and 132 as they are not properly classified. 
 
 # Add new features
-
+This time we use **one Second**
 ```{r message= F , warning=FALSE}
 frequency <- 10
-window_size_sec <- 2
+window_size_sec <- 1
 # The number of features reduces by this
 reduction_coef <-  window_size_sec * frequency
 new_features_df <-
