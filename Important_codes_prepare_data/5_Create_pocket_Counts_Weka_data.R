@@ -52,12 +52,12 @@ working_df  %<>% select(-c(7:16))
 working_df[,2:4] <- working_df[,2:4] / 9.808
 
 # save for Weka
-fwrite(working_df, "Ethica_Jaeger_Merged/pocket/pocket.csv")
+#fwrite(working_df, "Ethica_Jaeger_Merged/pocket/pocket.csv")
 
 
 # create data set for Weka
 ##---------------------------------------------------------##
-main_df <- fread("Ethica_Jaeger_Merged/pocket/pocket.csv")
+main_df <- working_df
 
 # convert string to time class
 main_df$record_time  %<>% as_datetime()
@@ -81,14 +81,15 @@ par_list  %>% map(function(p_id){
   # Calculate counts then vector magnitude 
   counts <- working_df  %>% counts(data = .,x_axis = 2,y_axis = 3,z_axis = 4,hertz = 30, start_time = start_time)
   colnames(counts)[1] <- "record_time"
+  
   mag <- function(x,y,z) {
     return(sqrt(x^2+y^2+z^2))
   }
   
-  counts  %<>% mutate(Counts_vec_mag = mag(counts$x, counts$y, counts$z)) %>% select(record_time, Counts_vec_mag)
+  counts  %<>% mutate(counts_vec_mag = mag(counts$x, counts$y, counts$z)) %>% select(record_time, x, y, z, counts_vec_mag)
 
   #Join with the raw data and impute 
-  working_df  <- full_join(working_df,counts , by = "record_time") %>% fill(Counts_vec_mag)
+  working_df  <- full_join(working_df,counts , by = "record_time") %>% fill(counts_vec_mag)
   
   
   # delete transit
@@ -100,8 +101,14 @@ par_list  %>% map(function(p_id){
 })
 
 
+# reduce freq to remove duplicates
+final_df  %<>% groupdata2::group(n = 3, method = "greedy") %>%
+  rename("id" = .groups)
+final_df  %<>% group_by(id) %>%
+  summarise_all(first) %>%
+  select(-id)
 #save for Weka
-fwrite(final_df,"Ethica_Jaeger_Merged/pocket/All_participants_pocket_with_count_for_Weka.csv")
+fwrite(final_df,"Ethica_Jaeger_Merged/pocket/pocket_with_couns_and_vec_meg_not_duplicated.csv")
 
 
 
@@ -111,7 +118,6 @@ par_list  %>% map(function(p_id){
   counts_plot <- final_df %>% filter(participant_id == p_id) %>% ggplot() +
   geom_point(aes(x = record_time, y= x ,col = trimmed_activity)) +
     scale_x_datetime(breaks = pretty_breaks(n = 10))
-  
   ggsave(filename = paste0("Ethica_Jaeger_Merged/pocket/",p_id,"_counts_plot.jpeg"), plot = counts_plot)
   
 })

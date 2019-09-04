@@ -62,7 +62,7 @@ working_df  <-
   Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
 
 # Model A_1 only uses raw accel data
-working_df %<>%  dplyr::select(c(x_axis, y_axis, z_axis, x, y, z, height, weight, age,gender, trimmed_activity))
+working_df %<>%  dplyr::select(c(Counts_vec_mag, trimmed_activity))
 working_df  %<>% filter(trimmed_activity != "transit")
 
 # models canot work with strin
@@ -88,7 +88,7 @@ Note that we need to exclude Participants number 112 , 121 .122 , and 132 as the
 We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_axis`, `y_axis`, and `z_axis`. Then we apply the models. The window is set to 2 seconds.
 
 
-```{r message= T , warning=FALSE}
+```{r message= T , warning=FALSE , eval = FALSE}
 frequency <- 30
 window_size_sec <- 2
 # The number of features reduces by this
@@ -120,8 +120,8 @@ library(rpart)
 library(rpart.plot)
 
 # Shrink, center, scale and then split the data
-split_ratio <- 0.66
-shrink <- 0.01
+split_ratio <- 0.70
+shrink <- 1
 # Shrink
 working_df %<>% dplyr::sample_frac(shrink)
 message(paste0(shrink * 100, " % of the data will be used"))
@@ -134,20 +134,23 @@ training_indices <-
 training_df <- working_df %>% dplyr::slice(training_indices)
 testing_df <- working_df %>% dplyr::slice(-training_indices)
 
-# Scale and center
-preProcValues <-
-    preProcess(training_df, method = c("center", "scale"))
-training_df <- predict(preProcValues, training_df)
-testing_df <- predict(preProcValues, testing_df)
-message("Data is scaled and centered")
+# # Scale and center
+# preProcValues <-
+#     preProcess(training_df, method = c("center", "scale"))
+# training_df <- predict(preProcValues, training_df)
+# testing_df <- predict(preProcValues, testing_df)
+# message("Data is scaled and centered")
 
 # Create a decision tree model
-tree <- rpart(trimmed_activity ~ ., data = training_df, minsplit = 10, cp = .005) # cp = complexity parameter
+tree <- rpart(trimmed_activity ~ ., data = training_df, minsplit = 2, cp = .05) # cp = complexity parameter
 # Visualize the decision tree with rpart.plot
 rpart.plot(tree,
            box.palette = "RdBu",
            shadow.col = "gray",
-           nn = T )
+           nn = F) # , cex = 0.50 
+
+training_df_x <- training_df %>% select(-trimmed_activity)
+training_df_y <- training_df %>% select(trimmed_activity)
 
 testing_df_x <- testing_df %>% select(-trimmed_activity)
 testing_df_y <- testing_df %>% select(trimmed_activity)
@@ -156,16 +159,21 @@ pred_testing_y <- predict(tree, newdata = testing_df_x, type = "class") %>% data
 
 Accuracy(y_pred = pred_testing_y, y_true = testing_df_y)
 
+library(maptree)
+draw.tree(tree,cex=1)
+library(rattle)
+rattle::fancyRpartPlot(tree, cex = 0.65)
+
 ```
 
 ## Use C50 package to create a DT and plot it
 
 ```{r message=T, warning= T}
 library(C50)
-treeModel <- C5.0(x = training_df[, -11], y = training_df$trimmed_activity)
+treeModel <- C5.0(training_df_x, training_df_y$trimmed_activity)
 treeModel
 summary(treeModel)
-plot(treeModel, subtree = 's94')
-C50::C5imp(treeModel,pct = T)
+plot(treeModel,trial = 0)
+#C50::C5imp(treeModel,pct = T) # feature importance
 ```
 

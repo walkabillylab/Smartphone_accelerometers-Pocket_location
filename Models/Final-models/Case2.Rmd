@@ -1,7 +1,7 @@
 ---
-title: "Model_A_2"
+title: "Case 2"
 author: "Javad Khataei"
-date: "8/16/2019"
+date: "8/29/2019"
 output:
     html_document:
         code_folding : hide
@@ -12,17 +12,18 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Linear imputation, Counts
+## Linear imputation, vector magnitude of Counts
 
-In this markdown, we use the linear imputed data. **Counts** variables are used for this model. We can apply the following models using the `ApplyModels` function from `BEAP` package:
+In this markdown, we use the linear imputed data. Only **counts_vec_mag** variables are used for this model. We can apply the following models using the `ApplyModels` function from `BEAP` package:
 
 - `RF`, Random Forest
 - `LDA`, Linear Discriminant Analysis
 - `NB`, Naive Bayes
-- `KNN`, k-Nearest Neighbors
 - `SVM`, Support Vector Machines
-- `DT`, desicion Tree
+- `KNN`, k-Nearest Neighbors
+- `DT`, Desicion Tree
 
+ 
 ## Read and prepare the data
 ```{r message=FALSE, warning=FALSE}
 
@@ -39,7 +40,6 @@ library(MLmetrics)
 library(PRROC)
 library(gridExtra)
 library(kableExtra)
-library(groupdata2) 
 library(Beap) # It's not on CRAN yet
 
 
@@ -60,7 +60,7 @@ if (OS["sysname"] == "Windows") {
 
 # Read the file with x,y,z axis and labels.
 Ethica_df <-
-  fread(paste0(main_path,"/Ethica_Jaeger_Merged/pocket/All_participants_pocket_with_count_for_Weka.csv"))
+  fread(paste0(main_path,"/Ethica_Jaeger_Merged/pocket/pocket_with_couns_and_vec_meg_not_duplicated.csv"))
 
 
 # ---------------------------- Prepare the data ----------------------------
@@ -70,8 +70,9 @@ working_df  <-
   Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
 
 # Model A_1 only uses raw accel data
-working_df %<>%  dplyr::select(c(Counts_vec_mag, trimmed_activity))
+working_df %<>%  dplyr::select(c(counts_vec_mag, trimmed_activity))
 working_df  %<>% filter(trimmed_activity != "transit")
+
 
 # models canot work with strin
 working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
@@ -83,51 +84,53 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
       "Running_3_METs",
       "Running_5_METs",
       "Running_7_METs"
-    ))
+    )
+  )
 
-# To reduce the frequency 
-working_df  %<>% groupdata2::group(n = 30, method = "greedy") %>%
+# each 10 observation has one counts
+freq <- 10
+working_df  %<>% groupdata2::group(n = freq, method = "greedy") %>%
   rename( "id" = .groups )
 working_df  %<>% group_by(id) %>%
-  summarise(Counts_vec_mag = first(Counts_vec_mag) , trimmed_activity= first(trimmed_activity)) %>% 
+  summarise(counts_vec_mag = first(counts_vec_mag) , trimmed_activity= first(trimmed_activity)) %>% 
   select(-id)
+
 
 ```
 
-Note that we need to exclude Participants number 112 , 121 .122 , and 132 as they are not properly classified. Also, to save time, we can run the models on some of the data. Check the code for more details.
+Note that we need to exclude Participants number 112 , 121 .122 , and 132 as they are not properly classified. 
+
+
 
 ## Apply models
 ```{r message=TRUE, warning=FALSE}
 results <-
     Beap::ApplyModels(
         working_df = working_df,
-        model_names = c("RF", "LDA", "NB", "DT"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
+        model_names =c("RF","LDA", "NB"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
         split_ratio = 0.7,
         shrink = 1,
         return_plots = TRUE,
         save_results = FALSE,
-        RF_mtry = 1 # because we only have one predictor
+        RF_mtry = 1
     )
-
-
 ```
+
+
 
 ## Compare the results
 
 
-
 ```{r message=FALSE, warning=FALSE}
-# Uncomment if need to plot several plot in one image
-# p_LDA <- results$Plots["LDA"]$LDA
-# p_RF <- results$Plots["RF"]$RF
-#grid.arrange(p_LDA, p_RF, ncol=1)
 print(results$Plots)
 
 results$`Model-Accuracy` %>%  
   select(Accuracy, AUC, prAUC, Mean_F1, Mean_Sensitivity, Mean_Specificity) %>% 
+  round(digits = 3) %>% 
     kable(label = " Accuracy for each model") %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
     
-
+#save(results, file = "Case2_results.RData")
 ```
+
 

@@ -99,7 +99,7 @@ results <-
         working_df = working_df,
         model_names =c("RF"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
         split_ratio = 0.7,
-        shrink = 0.5,
+        shrink = 1,
         return_plots = TRUE,
         save_results = FALSE
     )

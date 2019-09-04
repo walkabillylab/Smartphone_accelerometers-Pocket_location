@@ -1,0 +1,213 @@
+---
+title: "Case 4"
+author: "Javad Khataei"
+date: "8/29/2019"
+output:
+    html_document:
+        code_folding : hide
+        toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Linear imputation, Counts(x,y,z,vec_mag) and its features
+
+In this markdown, we use the linear imputed data. Only **Counts(x,y,z,vec_mag) and its features** variables are used for this model. We can apply the following models using the `ApplyModels` function from `BEAP` package:
+
+- `RF`, Random Forest
+- `LDA`, Linear Discriminant Analysis
+- `NB`, Naive Bayes
+- `SVM`, Support Vector Machines
+- `KNN`, k-Nearest Neighbors
+- `DT`, desicion Tree
+
+ 
+## Read and prepare the data
+```{r message=FALSE, warning=FALSE}
+
+#import libraries
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(activityCounts)
+library(magrittr)
+library(scales)
+library(caret)
+library(stringr)
+library(MLmetrics)
+library(PRROC)
+library(gridExtra)
+library(kableExtra)
+library(imputeTS)
+library(Beap) # It's not on CRAN yet
+
+
+
+
+
+# ---------------------------- Read the data ----------------------
+
+# set the working directory to the folder that has the raw data and the intervals file
+OS <- Sys.info()
+if (OS["sysname"] == "Windows") {
+  main_path <-
+    "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+} else {
+  main_path <-
+    "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+}
+
+# Read the file with x,y,z axis and labels.
+Ethica_df <-
+  fread(paste0(main_path,"/Ethica_Jaeger_Merged/pocket/pocket_with_couns_and_vec_meg_not_duplicated.csv"))
+
+
+# ---------------------------- Prepare the data ----------------------------
+
+# Participants 112 , 121 .122 , and 132 are not properly classified
+working_df  <-
+  Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
+
+# Model A_1 only uses raw accel data
+working_df %<>%  dplyr::select(c(x, y, z, counts_vec_mag, trimmed_activity))
+working_df  %<>% filter(trimmed_activity != "transit")
+
+
+# models canot work with strin
+working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
+  factor(
+    levels = c(
+      "Lying",
+      "Sitting",
+      "Self_Pace_walk",
+      "Running_3_METs",
+      "Running_5_METs",
+      "Running_7_METs"
+    )
+  )
+
+# # each 10 observation has one counts so reduce from 10Hz to 1Hz
+frequency <- 10
+working_df  %<>% groupdata2::group(n = frequency, method = "greedy") %>%
+  rename( "id" = .groups )
+working_df  %<>% group_by(id) %>%
+  summarise_all(first) %>%
+  select(-id)
+
+
+```
+
+Note that we need to exclude Participants number 112 , 121 .122 , and 132 as they are not properly classified. 
+
+
+## Generate new features
+We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_counts`, `y_counts`, and `z_counts`. Then we apply the models. The window is set to 2 seconds.
+
+
+```{r message= T , warning=FALSE}
+frequency <- 1 # freq of new data which is counts not raw x,y,z axis
+window_size_sec <- 2
+# The number of features reduces by this
+reduction_coef <-  window_size_sec * frequency
+new_features_df <-
+  GenerateFeatures(raw_df = working_df,
+                   window_size_sec = window_size_sec,
+                   frequency = frequency) 
+# Increase the frequency
+new_features_df <-
+  new_features_df[rep(1:nrow(new_features_df) , each = reduction_coef),]
+
+
+# reduce the size of working_df to add new_features
+working_df  %<>% slice(1:nrow(new_features_df))
+
+working_df <- bind_cols(working_df, new_features_df)
+# some models cannpt train if there is any NA
+working_df  %<>% na_interpolation(option =  "linear")
+
+```
+<!-- ## removing highly correlated variables -->
+<!-- If we have feature which are highly correlated, some model such as LDA cannot perform properly  -->
+
+```{r eval=FALSE, include=FALSE}
+# remove highly corollated features
+coef_df <- working_df %>%  select(-trimmed_activity) %>% as.numeric() %>% cor(use = "complete.obs")
+helper <- findCorrelation(coef_df, cutoff=0.5)  %>% sort()
+reduced_Data = df1[,-c(helper)]
+  
+  
+```
+<!-- ## Removing constant features -->
+<!-- It seems that some of the features arte constant and LDA cannot perform while they are in the dataset. -->
+```{r eval=FALSE, include=FALSE}
+working_df %<>%  select(-c(29, 30, 31, 32, 33, 34, 35, 36, 37))
+```
+
+## Remove features based on feature importance
+Here we delete the features which have zero effect on the results. We get this features by running RF on the the data and calculating feature importance. 
+
+```{r}
+working_df %<>%  select(-c(
+acf_x,
+acf_y,
+acf_z,
+skw_x,
+skw_y,
+skw_z,
+krt_x,
+krt_y,
+krt_z))
+
+```
+
+
+## Apply models
+```{r message=TRUE, warning=FALSE}
+results <-
+    Beap::ApplyModels(
+        working_df = working_df,
+        model_names =c("LDA" , "RF", "NB"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
+        split_ratio = 0.7,
+        shrink = 1,
+        return_plots = TRUE,
+        save_results = FALSE,
+        RF_mtry = 1
+    )
+```
+
+
+
+## Compare the results
+
+
+```{r message=FALSE, warning=FALSE}
+print(results$Plots)
+
+results$`Model-Accuracy` %>%  
+  select(Accuracy, AUC, prAUC, Mean_F1, Mean_Sensitivity, Mean_Specificity) %>% 
+  round(digits = 3) %>% 
+    kable(label = " Accuracy for each model") %>%
+    kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
+     
+#save(results, "Case4_reults.RData")
+```
+
+### Feature importance for RF
+
+```{r}
+
+
+imp_table <- results$RF_Feature_Importance$importance
+
+row_names <- rownames(imp_table)
+
+imp_table  %>% data.frame(row_names, .) %>% 
+  arrange(desc(Overall) ) %>% 
+  kable(label = " Top ten important features for RF model") %>%
+    kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
+
+```
+
+

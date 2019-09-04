@@ -1,7 +1,7 @@
 ---
 title: "Features Summary"
 author: "Javad Khataei"
-date: "8/28/2019"
+date: "9/04/2019"
 output:
     html_document:
         code_folding : hide
@@ -12,12 +12,13 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-In this markdown, we use **x_axis, y_axis, z_axis** variables to created new features and then we have a look at the **Mean** and **Standard devation** of the features. 
+In this markdown, we use **x, y, z Counts** variables to created new features and then we have a look at the **Mean** and **Standard devation** of the features. 
 
 ## Generating Features
 
 ### Read and prepare the data
 ```{r message=FALSE, warning=FALSE}
+
 
 #import libraries
 library(data.table)
@@ -53,7 +54,7 @@ if (OS["sysname"] == "Windows") {
 
 # Read the file with x,y,z axis and labels.
 Ethica_df <-
-  fread(paste0(main_path,"/Ethica_Jaeger_Merged/pocket/All_participants_pocket_with_count_for_Weka.csv"))
+  fread(paste0(main_path,"/Ethica_Jaeger_Merged/pocket/pocket_with_couns_and_vec_meg_not_duplicated.csv"))
 
 
 # ---------------------------- Prepare the data ----------------------------
@@ -62,9 +63,10 @@ Ethica_df <-
 working_df  <-
   Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
 
-# select everything for comparision
-working_df %<>%  dplyr::select(c(x_axis, y_axis, z_axis, participant_id, trimmed_activity))
+# Model A_1 only uses raw accel data
+working_df %<>%  dplyr::select(c(x, y, z, counts_vec_mag, participant_id, trimmed_activity))
 working_df  %<>% filter(trimmed_activity != "transit")
+
 
 # models canot work with strin
 working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
@@ -76,8 +78,16 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
       "Running_3_METs",
       "Running_5_METs",
       "Running_7_METs"
-    ))
+    )
+  )
 
+# # each 10 observation has one counts so reduce from 10Hz to 1Hz
+frequency <- 10
+working_df  %<>% groupdata2::group(n = frequency, method = "greedy") %>%
+  rename( "id" = .groups )
+working_df  %<>% group_by(id) %>%
+  summarise_all(first) %>%
+  select(-id)
 
 ```
 
@@ -86,25 +96,27 @@ Note that we need to exclude Participants number 112 , 121 .122 , and 132 as the
 
 
 ### Generate new features
-We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_axis`, `y_axis`, and `z_axis`. Then we apply the models. The window is set to 2 seconds.
+We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x`, `y`, and `z` counts. Then we apply the models. The window is set to 2 seconds. The Counts frequency is 1 Hz.
 
 
 ```{r message= T , warning=FALSE}
-frequency <- 30
+frequency <- 1 # freq of new data which is counts not raw x,y,z axis
 window_size_sec <- 2
 # The number of features reduces by this
-reduction_coef <-  window_size_sec * frequency 
-new_features_df <- GenerateFeatures(raw_df = working_df, window_size_sec = window_size_sec, frequency = frequency)
-
-
+reduction_coef <-  window_size_sec * frequency
+new_features_df <-
+  GenerateFeatures(raw_df = working_df,
+                   window_size_sec = window_size_sec,
+                   frequency = frequency) 
 # Increase the frequency
-new_features_df <- new_features_df[rep(1:nrow(new_features_df) , each = reduction_coef), ]
+new_features_df <-
+  new_features_df[rep(1:nrow(new_features_df) , each = reduction_coef),]
 
 
 # reduce the size of working_df to add new_features
 working_df  %<>% slice(1:nrow(new_features_df))
-## model A-4 uses new_features too
-working_df <- bind_cols(working_df,new_features_df)
+
+working_df <- bind_cols(working_df, new_features_df)
 # some models cannpt train if there is any NA
 working_df  %<>% na_interpolation(option =  "linear")
 
@@ -120,7 +132,7 @@ working_df  %<>% na_interpolation(option =  "linear")
 ```{r message=FALSE, warning=FALSE}
 
 working_df %>% group_by(participant_id) %>% 
-        select(-c(gender,trimmed_activity)) %>% 
+        select(-c(trimmed_activity)) %>% 
     summarise_all(mean) %>%  
     kable(label = " Features SD for each participant") %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) %>% 
