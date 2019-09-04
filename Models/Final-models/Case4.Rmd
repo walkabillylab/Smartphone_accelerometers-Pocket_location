@@ -88,13 +88,21 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
     )
   )
 
-# # each 10 observation has one counts so reduce from 10Hz to 1Hz
-frequency <- 10
-working_df  %<>% groupdata2::group(n = frequency, method = "greedy") %>%
+
+# We need to delete NAs, each 10 observation has one counts
+freq <- 10
+working_df  %<>% groupdata2::group(n = freq, method = "greedy") %>%
   rename( "id" = .groups )
 working_df  %<>% group_by(id) %>%
-  summarise_all(first) %>%
+  summarise(x = max(x, na.rm = T),
+            y = max(y, na.rm = T),
+            z = max(z, na.rm = T),
+            counts_vec_mag = first(counts_vec_mag),
+            trimmed_activity= first(trimmed_activity)) %>% 
   select(-id)
+
+# or use this : 
+#working_df  %<>% na.omit()
 
 
 ```
@@ -103,12 +111,12 @@ Note that we need to exclude Participants number 112 , 121 .122 , and 132 as the
 
 
 ## Generate new features
-We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_counts`, `y_counts`, and `z_counts`. Then we apply the models. The window is set to 2 seconds.
+We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_counts`, `y_counts`, and `z_counts`. Then we apply the models. The window is set to 10 seconds.
 
 
 ```{r generateFeatures, message= T , warning=FALSE}
 frequency <- 1 # freq of new data which is counts not raw x,y,z axis
-window_size_sec <- 2
+window_size_sec <- 10
 # The number of features reduces by this
 reduction_coef <-  window_size_sec * frequency
 new_features_df <-
@@ -128,39 +136,23 @@ working_df <- bind_cols(working_df, new_features_df)
 working_df  %<>% na_interpolation(option =  "linear")
 
 ```
-<!-- ## removing highly correlated variables -->
-<!-- If we have feature which are highly correlated, some model such as LDA cannot perform properly  -->
 
-```{r eval=FALSE, include=FALSE}
-# remove highly corollated features
-coef_df <- working_df %>%  select(-trimmed_activity) %>% as.numeric() %>% cor(use = "complete.obs")
-helper <- findCorrelation(coef_df, cutoff=0.5)  %>% sort()
-reduced_Data = df1[,-c(helper)]
-  
-  
-```
-<!-- ## Removing constant features -->
-<!-- It seems that some of the features arte constant and LDA cannot perform while they are in the dataset. -->
-```{r eval=FALSE, include=FALSE}
-working_df %<>%  select(-c(29, 30, 31, 32, 33, 34, 35, 36, 37))
-```
+<!-- ## Remove features based on feature importance -->
+<!-- Here we delete the features which have zero effect on the results. We get this features by running RF on the the data and calculating feature importance.  -->
 
-## Remove features based on feature importance
-Here we delete the features which have zero effect on the results. We get this features by running RF on the the data and calculating feature importance. 
+<!-- ```{r trimFeatures} -->
+<!-- working_df %<>%  select(-c( -->
+<!-- acf_x, -->
+<!-- acf_y, -->
+<!-- acf_z, -->
+<!-- skw_x, -->
+<!-- skw_y, -->
+<!-- skw_z, -->
+<!-- krt_x, -->
+<!-- krt_y, -->
+<!-- krt_z)) -->
 
-```{r trimFeatures}
-working_df %<>%  select(-c(
-acf_x,
-acf_y,
-acf_z,
-skw_x,
-skw_y,
-skw_z,
-krt_x,
-krt_y,
-krt_z))
-
-```
+<!-- ``` -->
 
 
 ## Apply models
@@ -168,11 +160,12 @@ krt_z))
 results <-
     Beap::ApplyModels(
         working_df = working_df,
-        model_names =c("LDA" , "RF"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
+        model_names =c("LDA", "RF", "NB"), #c("RF", "LDA", "NB", "SVM", "KNN", "DT")
         split_ratio = 0.7,
         shrink = 1,
         return_plots = TRUE,
         save_results = FALSE,
+        scale_center = TRUE,
         RF_mtry = 1
     )
 ```
