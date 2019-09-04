@@ -80,14 +80,8 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
       "Running_7_METs"
     )
   )
+working_df  %<>% na.omit()
 
-# # each 10 observation has one counts so reduce from 10Hz to 1Hz
-frequency <- 10
-working_df  %<>% groupdata2::group(n = frequency, method = "greedy") %>%
-  rename( "id" = .groups )
-working_df  %<>% group_by(id) %>%
-  summarise_all(first) %>%
-  select(-id)
 
 ```
 
@@ -101,7 +95,7 @@ We use the function ``GenerateFeatures` from the `Beap` package to create new fe
 
 ```{r message= T , warning=FALSE}
 frequency <- 1 # freq of new data which is counts not raw x,y,z axis
-window_size_sec <- 2
+window_size_sec <- 10
 # The number of features reduces by this
 reduction_coef <-  window_size_sec * frequency
 new_features_df <-
@@ -301,18 +295,34 @@ working_df %>%
 
 ```
 
+## Remove features with zero SD
+
+```{r trimFeatures}
+working_df %<>%  select(-c(
+acf_x,
+acf_y,
+acf_z,
+skw_x,
+skw_y,
+skw_z,
+krt_x,
+krt_y,
+krt_z))
+
+```
 
 
 
 # Plot Mean for all
 ```{r}
-new_features_df %>% 
-  summarise_all(mean) %>% 
+
+working_df %>% 
+  select(-c(participant_id,trimmed_activity)) %>% 
+  summarise_all(sd) %>% 
   stack() %>% 
   ggplot(aes(x = ind, y = values)) +
-  geom_violin() +
+  geom_point(scale = "width") +
   geom_boxplot(width=0.1)
-
 ```
 
 
@@ -350,6 +360,4 @@ table_df %>%
 
 ```
 
-
-```
 
