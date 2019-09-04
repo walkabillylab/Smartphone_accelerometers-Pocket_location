@@ -34,6 +34,7 @@ library(PRROC)
 library(gridExtra)
 library(kableExtra)
 library(imputeTS)
+library(reshape)
 library(Beap) # It's not on CRAN yet
 
 
@@ -80,6 +81,7 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
       "Running_7_METs"
     )
   )
+
 working_df  %<>% na.omit()
 
 
@@ -93,9 +95,9 @@ Note that we need to exclude Participants number 112 , 121 .122 , and 132 as the
 We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x`, `y`, and `z` counts. Then we apply the models. The window is set to 2 seconds. The Counts frequency is 1 Hz.
 
 
-```{r message= T , warning=FALSE}
+```{r message= F , warning=FALSE}
 frequency <- 1 # freq of new data which is counts not raw x,y,z axis
-window_size_sec <- 10
+window_size_sec <- 2
 # The number of features reduces by this
 reduction_coef <-  window_size_sec * frequency
 new_features_df <-
@@ -121,7 +123,7 @@ working_df  %<>% na_interpolation(option =  "linear")
 
 
 
-## Calculated Mean for each participant
+## Calculate Mean for each participant
 
 ```{r message=FALSE, warning=FALSE}
 
@@ -134,21 +136,22 @@ working_df %>% group_by(participant_id) %>%
  
 ```
 
-## Calculated Mean for all 
+### Calculate Mean for all 
 
 ```{r message=FALSE, warning=FALSE}
 working_df %>% 
     select(-c(participant_id, trimmed_activity)) %>% 
     summarise_all(mean) %>%  
     kable(label = " Features mean for all participant") %>%
-    kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) 
+    kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) %>% 
+    scroll_box(width = "700px", height = "100%")
  
 ```
 
 
 
 
-## Calculated SD for each participant 
+### Calculate SD for each participant 
 
 ```{r message=FALSE, warning=FALSE}
 working_df %>% group_by(participant_id) %>% 
@@ -164,22 +167,26 @@ As it is shown above, nine features, do not have any standard deviation, meaning
 
 
 
-## Calculated SD for all 
+### Calculate SD for all 
 
 ```{r message=FALSE, warning=FALSE}
 working_df %>% 
         select(-c(participant_id,trimmed_activity)) %>% 
     summarise_all(sd) %>%  
     kable(label = " Features SD for al participant") %>%
-    kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) 
+    kable_styling(full_width = T, bootstrap_options = c("striped", "hover", "responsive")) %>% 
+    scroll_box(width = "700px", height = "100%")
  
 ```
 
-We need to eliminate these features in final Case 4 as they don't carry any usable information.
+If we use a window size of 2 second, these feature have a sd of zero therfore, we need to eliminate these features in final Case 4 as they don't carry any usable information. However, it is bettter to increase window size to solve this issue.
 
 
-# Plot Mean 
-```{r}
+
+
+# Plots
+Here we plot box plots and violin plots for each feature
+```{r plots}
 working_df %>% 
   select(-c(participant_id,trimmed_activity)) %>% 
   select(1:5) %>% 
@@ -272,7 +279,7 @@ working_df %>%
 
 working_df %>% 
   select(-c(participant_id,trimmed_activity)) %>% 
-  select(56:59) %>% 
+  select(56:nrow(working_df)) %>% 
   stack() %>% 
   ggplot(aes(x = ind, y = values)) +
   geom_violin(scale = "width") +
@@ -281,39 +288,27 @@ working_df %>%
 
 
 ```
-```{r eval=FALSE, include=FALSE}
 
-size <- nrow(working_df) * 5 # plotting 5 variables in each graph
+<!-- ## Remove features with zero SD -->
 
-working_df %>% 
-  select(-c(participant_id,trimmed_activity)) %>% 
-  stack() %>% groupdata2::group(n = size, method = "greedy") %>%
-  rename("id" = .groups) %>%  group_by(id) %>% 
-  ggplot(aes(x = ind, y = values)) +
-  geom_violin(scale = "width") +
-  geom_boxplot(width=0.1)
+<!-- ```{r trimFeatures, eval=FALSE, include=FALSE} -->
+<!-- working_df %<>%  select(-c( -->
+<!-- acf_x, -->
+<!-- acf_y, -->
+<!-- acf_z, -->
+<!-- skw_x, -->
+<!-- skw_y, -->
+<!-- skw_z, -->
+<!-- krt_x, -->
+<!-- krt_y, -->
+<!-- krt_z)) -->
 
-```
-
-## Remove features with zero SD
-
-```{r trimFeatures}
-working_df %<>%  select(-c(
-acf_x,
-acf_y,
-acf_z,
-skw_x,
-skw_y,
-skw_z,
-krt_x,
-krt_y,
-krt_z))
-
-```
+<!-- ``` -->
 
 
 
-# Plot Mean for all
+# Plot SD for all features
+X axis shows features and y axis shows SD
 ```{r}
 
 working_df %>% 
@@ -321,12 +316,12 @@ working_df %>%
   summarise_all(sd) %>% 
   stack() %>% 
   ggplot(aes(x = ind, y = values)) +
-  geom_point(scale = "width") +
-  geom_boxplot(width=0.1)
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 45))
 ```
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 Mean_SD <- function(x) { # a function to calculate mean and SD and return them together
   paste0(round(mean(x),digits = 2)," (", round(sd(x), digits = 2),")")
 }
