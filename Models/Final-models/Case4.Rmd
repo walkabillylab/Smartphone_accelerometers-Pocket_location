@@ -165,7 +165,7 @@ results <-
         shrink = 1,
         return_plots = TRUE,
         save_results = FALSE,
-        scale_center = TRUE,
+        scale_center = FALSE,
         RF_mtry = 1
     )
 ```
