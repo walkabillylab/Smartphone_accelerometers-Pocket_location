@@ -4,13 +4,25 @@
 # To extract raw data and change the frequency to 30Hz
 # This file is similar to 1_Ethica_reader_extract_from_intervals.R but 
 # returns 30Hz data
+# Used furrr package for parallel comuting
+# fututre_map instead of map
 
 # import libraries
 library(data.table)
 library(tidyverse)
 library(lubridate)
+library(dplyr)
 library(scales)
 library(signal)
+library(magrittr)
+library(furrr)
+
+
+# prepare for parallel 
+plan(multisession) 
+options(future.globals.maxSize = 1000 * 1024^2) 
+
+
 
 ## ------------------------ Convert frequency function------------------------------##
 convert_freq <- function(df) {
@@ -35,7 +47,8 @@ convert_freq <- function(df) {
   # Calculate period
   df$n <- 1/ df$n
   
-  # apply resample and get a dataframe which has a list of 30 reading for each sec
+  # apply resample and get a dataframe which has a list of 36 reading for each sec
+  # Theb select 30 of these 36 reading. Reason: the beginning and the end readings are not reliable
   df_30hrz <-
     df %>%
     group_by(record_time) %>%
@@ -43,9 +56,9 @@ convert_freq <- function(df) {
     mutate(x_axis_c = x_axis, y_axis_c = y_axis, z_axis_c = z_axis) %>% 
     nest(x_axis_c, y_axis_c, z_axis_c , n) %>% 
     mutate(
-      new_x =  map(data, ~signal::resample(.$x_axis_c, first((.$n)), 0.033333)),
-      new_y =  map(data, ~signal::resample(.$y_axis_c, first((.$n)), 0.033333)),
-      new_z =  map(data, ~signal::resample(.$z_axis_c, first((.$n)), 0.033333)),
+      new_x =  furrr::future_map(data, ~signal::resample(.$x_axis_c, first((.$n)), 0.027777) %>% data.frame() %>% slice(6:35)),
+      new_y =  furrr::future_map(data, ~signal::resample(.$y_axis_c, first((.$n)), 0.027777) %>% data.frame() %>% slice(6:35)),
+      new_z =  furrr::future_map(data, ~signal::resample(.$z_axis_c, first((.$n)), 0.027777) %>% data.frame() %>% slice(6:35)),
       ) %>%  select(record_time , new_x , new_y, new_z)
 
   # Unlist ( expand) the create dataset for combining with time
@@ -71,7 +84,8 @@ convert_freq <- function(df) {
 
 
   # df_extended has the times and df_30hz_unlist has the readings
-  df_final <- cbind(df_extended$record_time, df_30hz_unlist)
+  df_final <- cbind(df_extended$record_time, df_30hz_unlist) %>%  as.data.frame()
+  colnames(df_final) <- c("record_time", "x_axis", "y_axis", "z_axis")
   
   
   
@@ -97,7 +111,7 @@ setwd(dir = main_path)
 ## ------------------------- loop through all months and locations---------------------##
 mons <- c("01", "02", "03", "04", "05")
 
-dev_ids <- c("2673", "2674", "2675")
+dev_ids <- c("2675","2673", "2674")
 # #set the study year
 study_year <- "2019"
 
@@ -135,7 +149,8 @@ for (dev_id in dev_ids) {
 
 
     # read the interval files that has all the intrvals for different participants
-    intervals_file <- fread(file = "intervals.csv")
+    intervals_file <- fread(file = "intervals.csv") 
+    
 
 
     # get the year and the month out of intervals_file
@@ -143,19 +158,20 @@ for (dev_id in dev_ids) {
       as.Date(intervals_file$start) %>%
       format(format = "%Y_%m") %>%
       as.character() %>%
-      mutate(intervals_file, year_month = .)
+      mutate(intervals_file, year_month = .) %>%
+      na.omit()
 
     # Select participants who participated during study_year_month
     Selected_part <-
-      intervals_file %>% filter(intervals_file$year_month == study_year_month)
+      intervals_file %>% dplyr::filter(intervals_file$year_month == study_year_month)
 
 
     # for each selected participant
-    Selected_part$userid %>% map(function(i) {
+    Selected_part$userid %>% furrr::future_map(function(i) {
 
       # get the current participant and extract its info,i.e id, start and end time
       current_participant <-
-        Selected_part %>% filter(Selected_part$userid == i)
+        Selected_part %>% dplyr::filter(Selected_part$userid == i)
 
       participant_id <- current_participant$userid
 
