@@ -38,7 +38,7 @@ library(Beap) # It's not on CRAN yet
 
 
 
-
+ 
 # ---------------------------- Read the data ----------------------
 
 # set the working directory to the folder that has the raw data and the intervals file
@@ -85,10 +85,10 @@ Note that we need to exclude Participants number 112 , 121 .122 , and 132 as the
 
 
 ### Generate new features
-We use the function ``GenerateFeatures` from the `Beap` package to create new features for `x_axis`, `y_axis`, and `z_axis`. Then we apply the models. The window is set to 2 seconds.
+We use the function `GenerateFeatures` from the `Beap` package to create new features for `x_axis`, `y_axis`, and `z_axis`. Then we apply the models. The window is set to 2 seconds.
 
 
-```{r message= T , warning=FALSE}
+```{r message = T , warning = FALSE}
 frequency <- 10
 window_size_sec <- 2
 # The number of features reduces by this
@@ -106,7 +106,6 @@ working_df  %<>% slice(1:nrow(new_features_df))
 working_df <- bind_cols(working_df,new_features_df)
 # some models cannpt train if there is any NA
 working_df  %<>% na_interpolation(option =  "linear")
-
 
 ```
 
@@ -167,8 +166,6 @@ working_df %>%
     scroll_box(width = "700px", height = "100%")
  
 ```
-
-
 
 
 # Plots
@@ -273,8 +270,6 @@ working_df %>%
   geom_violin(scale = "width") +
   geom_boxplot(width=0.1)
 
-
-
 ```
 
 
@@ -282,8 +277,8 @@ working_df %>%
 
 # Plot SD for all features
 X axis shows features and y axis shows SD
-```{r}
 
+```{r}
 working_df %>% 
   select(-c(participant_id,trimmed_activity)) %>% 
   summarise_all(sd) %>% 
@@ -292,3 +287,6 @@ working_df %>%
   geom_point() +
   theme(axis.text.x = element_text(angle = 45))
 ```
+
+
+
