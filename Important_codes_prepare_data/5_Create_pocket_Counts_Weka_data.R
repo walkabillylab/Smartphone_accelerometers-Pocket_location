@@ -30,8 +30,9 @@ if (OS["sysname"] == "Windows") {
     "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
 }
 setwd(dir = main_path)
-
-working_df <- fread("Ethica_Jaeger_Merged/Ethica_jaeger_merged_metadata.csv")
+# for 10Hz use Ethica_jaeger_merged_metadata.csv
+# for 30Hz use Ethica_jaeger_merged_metadata_30Hz.csv
+working_df <- fread("Ethica_Jaeger_Merged/Ethica_jaeger_merged_metadata_30Hz.csv")
 
 # Filter based on the wear location
 ## Pocket location
@@ -73,8 +74,9 @@ par_list  %>% map(function(p_id){
   # filter for each participant 
   working_df <- main_df %>% filter( participant_id == p_id)
   
-  # Repeat the data three times for each timestep
-  working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
+  # Increase freq if the freq is 10 HZ.Repeat the data three times for each timestep
+  # Comment for 30Hz data
+  # working_df <- working_df[rep(1:nrow(working_df) , each = 3), ]
   start_time <- working_df$record_time %>%  first() %>%  as_datetime()
   
   
@@ -101,14 +103,14 @@ par_list  %>% map(function(p_id){
 })
 
 
-# reduce freq to remove duplicates
-final_df  %<>% groupdata2::group(n = 3, method = "greedy") %>%
-  rename("id" = .groups)
-final_df  %<>% group_by(id) %>%
-  summarise_all(first) %>%
-  select(-id)
-#save for Weka
-fwrite(final_df,"Ethica_Jaeger_Merged/pocket/pocket_with_couns_and_vec_meg_not_duplicated.csv")
+# reduce freq to remove duplicates for 10HZ data. Comment for 30HZ
+# final_df  %<>% groupdata2::group(n = 3, method = "greedy") %>%
+#   rename("id" = .groups)
+# final_df  %<>% group_by(id) %>%
+#   summarise_all(first) %>%
+#   select(-id)
+#save for furthure analysis
+fwrite(final_df,"Ethica_Jaeger_Merged/pocket/pocket_with_couns_and_vec_meg_30Hz.csv")
 
 
 
@@ -116,9 +118,9 @@ fwrite(final_df,"Ethica_Jaeger_Merged/pocket/pocket_with_couns_and_vec_meg_not_d
 #plot and save for each paricipant
 par_list  %>% map(function(p_id){
   counts_plot <- final_df %>% filter(participant_id == p_id) %>% ggplot() +
-  geom_point(aes(x = record_time, y= x ,col = trimmed_activity)) +
+  geom_point(aes(x = record_time, y= x_axis ,col = trimmed_activity)) +
     scale_x_datetime(breaks = pretty_breaks(n = 10))
-  ggsave(filename = paste0("Ethica_Jaeger_Merged/pocket/",p_id,"_counts_plot.jpeg"), plot = counts_plot)
+  ggsave(filename = paste0("Ethica_Jaeger_Merged/pocket/",p_id,"_x_counts_30Hz.jpeg"), plot = counts_plot)
   
 })
 
