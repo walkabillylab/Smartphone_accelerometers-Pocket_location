@@ -16,11 +16,12 @@ library(scales)
 library(signal)
 library(magrittr)
 library(furrr)
+library(purrr)
 
 
 # prepare for parallel 
-plan(multisession) 
-options(future.globals.maxSize = 1000 * 1024^2) 
+#plan(multisession, workers = 3) 
+#options(future.globals.maxSize = 1000 * 1024^2) 
 
 
 
@@ -56,9 +57,9 @@ convert_freq <- function(df) {
     mutate(x_axis_c = x_axis, y_axis_c = y_axis, z_axis_c = z_axis) %>% 
     nest(x_axis_c, y_axis_c, z_axis_c , n) %>% 
     mutate(
-      new_x =  furrr::future_map(data, ~signal::resample(.$x_axis_c, first((.$n)), 0.027777) %>% data.frame() %>% slice(6:35)),
-      new_y =  furrr::future_map(data, ~signal::resample(.$y_axis_c, first((.$n)), 0.027777) %>% data.frame() %>% slice(6:35)),
-      new_z =  furrr::future_map(data, ~signal::resample(.$z_axis_c, first((.$n)), 0.027777) %>% data.frame() %>% slice(6:35)),
+      new_x =  map(data, ~signal::resample(.$x_axis_c, first((.$n)), 0.027777) %>% data.frame() %>% slice(6:35)),
+      new_y =  map(data, ~signal::resample(.$y_axis_c, first((.$n)), 0.027777) %>% data.frame() %>% slice(6:35)),
+      new_z =  map(data, ~signal::resample(.$z_axis_c, first((.$n)), 0.027777) %>% data.frame() %>% slice(6:35)),
       ) %>%  select(record_time , new_x , new_y, new_z)
 
   # Unlist ( expand) the create dataset for combining with time
@@ -109,7 +110,7 @@ setwd(dir = main_path)
 
 
 ## ------------------------- loop through all months and locations---------------------##
-mons <- c("01", "02", "03", "04", "05")
+mons <- c("04","05","01", "02","03")
 
 dev_ids <- c("2675","2673", "2674")
 # #set the study year
@@ -167,7 +168,7 @@ for (dev_id in dev_ids) {
 
 
     # for each selected participant
-    Selected_part$userid %>% furrr::future_map(function(i) {
+    Selected_part$userid %>% map(function(i) {
 
       # get the current participant and extract its info,i.e id, start and end time
       current_participant <-
