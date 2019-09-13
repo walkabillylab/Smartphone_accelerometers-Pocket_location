@@ -60,7 +60,7 @@ if (OS["sysname"] == "Windows") {
 
 # Read the file with x,y,z axis and labels.
 Ethica_df <-
-  fread(paste0(main_path,"/Ethica_Jaeger_Merged/pocket/All_participants_pocket_with_count_for_Weka.csv"))
+  fread(paste0(main_path,"/Ethica_Jaeger_Merged/pocket/pocket_with_couns_and_vec_meg_not_duplicated.csv"))
 
 
 # ---------------------------- Prepare the data ----------------------------
@@ -123,5 +123,19 @@ results$`Model-Accuracy` %>%
     kable(label = " Accuracy for each model") %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
     
+```
+
+## Feature importance for RF
+
+
+```{r}
+imp_table <- results$RF_Feature_Importance$importance
+
+row_names <- rownames(imp_table)
+
+imp_table  %>% data.frame(row_names, .) %>% 
+  arrange(desc(Overall) ) %>% 
+  kable(label = " Top ten important features for RF model") %>%
+    kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
 ```
 
