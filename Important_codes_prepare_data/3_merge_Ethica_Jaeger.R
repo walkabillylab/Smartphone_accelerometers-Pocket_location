@@ -76,7 +76,9 @@ total_jaeger_df$record_time <- total_jaeger_df$record_time %>% as_datetime()
 
 ################### use this for linear imputation
 # read Ethica data
-ethica_df <- fread("Ethica/Ethica_imputed_combined.csv")
+# for 10 hz read "Ethica_imputed_combined.csv"
+# for 30 hz read : "Ethica_imputed_combined_30Hz.csv"
+ethica_df <- fread("Ethica/Ethica_imputed_combined_30Hz.csv")
 ethica_df$record_time <- ethica_df$record_time %>% as_datetime()
 
 ## New line, order before merging to fix the problem of 132,122,21, and possiby 112
@@ -86,7 +88,7 @@ ethica_df <- ethica_df %>% arrange(record_time)
 total_df <- left_join(ethica_df, total_jaeger_df) %>% fill(activity, trimmed_activity)
 
 # save the file
-fwrite(x = total_df, file = "Ethica_Jaeger_Merged/Ethica_jaeger_merged.csv")
+fwrite(x = total_df, file = "Ethica_Jaeger_Merged/Ethica_jaeger_merged_30Hz.csv")
 
 
 
