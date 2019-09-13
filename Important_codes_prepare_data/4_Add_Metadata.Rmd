@@ -50,7 +50,8 @@ colnames(metadata) <- metadata_col_names
 
 Read the Ethica_jaeger_combined data
 ```{r}
-df <- fread("Ethica_Jaeger_Merged/Ethica_jaeger_merged.csv")
+# used for 30Hz, change to Ethica_jaeger_merged.csv for 10Hz
+df <- fread("Ethica_Jaeger_Merged/Ethica_jaeger_merged_30Hz.csv")
 
 ```
 
@@ -68,13 +69,14 @@ Save the result
 ```{r}
 path  <- paste0(path,"Ethica_Jaeger_Merged/")
 setwd(path)
-fwrite(final_data_frame,file = "Ethica_jaeger_merged_metadata.csv")
+# change for 10 HZ
+fwrite(final_data_frame,file = "Ethica_jaeger_merged_metadata_30Hz.csv")
 ```
 
 ## Repeat all for the special imputation method
 
 Read the Metadate
-```{r}
+```{r eval=FALSE, include=FALSE}
 metadata_path <- paste0(path, "Smart_AccelStudy_Participant Register & O2 calculator - Register.csv")
 
 # read the metadata file starting from row 2 and the age, height and weight columns
@@ -87,13 +89,13 @@ colnames(metadata) <- metadata_col_names
 
 
 Read the Ethica_jaeger_combined data
-```{r}
+```{r eval=FALSE, include=FALSE}
 df <- fread("Ethica_Jaeger_Merged/Ethica_jaeger_merged_pocket_special_imputation.csv")
 
 ```
 
 Join two datasets
-```{r}
+```{r eval=FALSE, include=FALSE}
 metadata <- metadata %>% 
   mutate(participant_id = as.character(participant_id))
 df <- df %>% mutate(participant_id = as.character(participant_id))
@@ -103,7 +105,7 @@ final_data_frame <- left_join(df, metadata, by = "participant_id")
 
 Save the result
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 path  <- paste0(path,"Ethica_Jaeger_Merged/")
 setwd(path)
 fwrite(final_data_frame,file = "Ethica_jaeger_merged_metadata_special_imputatiom.csv")

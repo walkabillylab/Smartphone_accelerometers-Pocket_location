@@ -416,7 +416,8 @@ metadata &lt;- read.csv(metadata_path, header = T, skip = 2, check.names = F) [ 
 metadata_col_names &lt;- c(&quot;participant_id&quot;, &quot;height&quot;, &quot;weight&quot;, &quot;age&quot;, &quot;gender&quot;)
 colnames(metadata) &lt;- metadata_col_names</code></pre>
 <p>Read the Ethica_jaeger_combined data</p>
-<pre class="r"><code>df &lt;- fread(&quot;Ethica_Jaeger_Merged/Ethica_jaeger_merged.csv&quot;)</code></pre>
+<pre class="r"><code># used for 30Hz, change to Ethica_jaeger_merged.csv for 10Hz
+df &lt;- fread(&quot;Ethica_Jaeger_Merged/Ethica_jaeger_merged_30Hz.csv&quot;)</code></pre>
 <p>Join two datasets</p>
 <pre class="r"><code>metadata &lt;- metadata %&gt;% 
   mutate(participant_id = as.character(participant_id))
@@ -426,7 +427,15 @@ final_data_frame &lt;- left_join(df, metadata, by = &quot;participant_id&quot;)<
 <p>Save the result</p>
 <pre class="r"><code>path  &lt;- paste0(path,&quot;Ethica_Jaeger_Merged/&quot;)
 setwd(path)
-fwrite(final_data_frame,file = &quot;Ethica_jaeger_merged_metadata.csv&quot;)</code></pre>
+# change for 10 HZ
+fwrite(final_data_frame,file = &quot;Ethica_jaeger_merged_metadata_30Hz.csv&quot;)</code></pre>
+</div>
+<div id="repeat-all-for-the-special-imputation-method" class="section level2">
+<h2>Repeat all for the special imputation method</h2>
+<p>Read the Metadate</p>
+<p>Read the Ethica_jaeger_combined data</p>
+<p>Join two datasets</p>
+<p>Save the result</p>
 </div>
 
 
