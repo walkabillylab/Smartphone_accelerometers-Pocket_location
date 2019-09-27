@@ -69,9 +69,9 @@ Ethica_df <-
 working_df  <-
   Ethica_df %>% filter(!(participant_id %in% c(112)))
 
-# Participants 112 , 121 .122 , and 132 are not properly classified
-working_df  <-
-  Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
+# # Participants 112 , 121 .122 , and 132 are not properly classified
+# working_df  <-
+#   Ethica_df %>% filter(!(participant_id %in% c(112, 121, 122, 132)))
 
 
 # Model A_1 only uses raw accel data
@@ -117,7 +117,8 @@ results <-
         shrink = 1,
         return_plots = TRUE,
         save_results = FALSE,
-        RF_mtry = 1
+        RF_mtry = 1,
+        min_node_size = 5
     )
 ```
 
@@ -136,6 +137,21 @@ results$`Model-Accuracy` %>%
     kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
     
 #save(results, file = "Case2_results.RData")
+```
+
+
+```{r}
+
+
+imp_table <- results$RF_Feature_Importance$importance
+
+row_names <- rownames(imp_table)
+
+imp_table  %>% data.frame(row_names, .) %>% 
+  arrange(desc(Overall) ) %>% 
+  kable(label = " Top ten important features for RF model") %>%
+    kable_styling(full_width = T, bootstrap_options = c("striped", "hover"))
+
 ```
 
 

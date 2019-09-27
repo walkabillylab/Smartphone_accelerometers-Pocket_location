@@ -1,5 +1,5 @@
 ---
-title: "Case 3 with 30Hz frequency "
+title: "Case 3 with 30Hz frequency - Leakage fixed"
 author: "Javad Khataei"
 date: "8/29/2019"
 output:
@@ -120,6 +120,22 @@ working_df <- bind_cols(working_df, new_features_df)
 working_df  %<>% na_interpolation(option =  "linear")
 
 ```
+# Fixing the high accuracy issue
+Since we have a dataset with 58 predictive features and 55 of these features are constant for every 30 readings, we have a leaky training set. The window is one second, and the frequency is 30Hz. Therefore every 30 readings have the same features. To fix this issue, we only use the first observation in each window. Also, the size of the dataset will be smaller, and the modelling process will be faster. 
+
+
+```{r}
+
+freq <- reduction_coef
+
+working_df  %<>% groupdata2::group(n = freq, method = "greedy") %>%
+  rename( "id" = .groups )
+
+working_df  %<>% group_by(id) %>%
+  summarise_all(first) %>% 
+  select(-id)
+
+```
 
 
 ## Apply models
@@ -131,8 +147,8 @@ results <-
         split_ratio = 0.7,
         shrink = 1,
         return_plots = TRUE,
-        save_results = FALSE,
-        min_node_size = 50
+        save_results = FALSE,min_node_size = 5
+        
     )
 ```
 

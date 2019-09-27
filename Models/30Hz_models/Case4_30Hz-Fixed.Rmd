@@ -1,5 +1,5 @@
 ---
-title: "Case 3 with 30Hz frequency "
+title: "Case 4 with 30Hz frequency - Leakage fixed"
 author: "Javad Khataei"
 date: "8/29/2019"
 output:
@@ -12,9 +12,9 @@ output:
 knitr::opts_chunk$set(echo = TRUE , eval = T)
 ```
 
-## Linear imputation, X, Y, Z axis, and Features
+## Linear imputation, Counts(x,y,z,vec_mag) and its features
 
-In this markdown, we use the linear imputed data. Only **X, Y, and Z-axis and Features** variables are used for this model. We can apply the following models using the `ApplyModels` function from `BEAP` package:
+In this markdown, we use the linear imputed data. Only **Counts(x,y,z,vec_mag) and its features** variables are used for this model. We can apply the following models using the `ApplyModels` function from `BEAP` package:
 
 - `RF`, Random Forest
 - `LDA`, Linear Discriminant Analysis
@@ -70,7 +70,7 @@ working_df  <-
   Ethica_df %>% filter(!(participant_id %in% c(112)))
 
 
-working_df %<>%  dplyr::select(c(x_axis, y_axis, z_axis, trimmed_activity))
+working_df %<>%  dplyr::select(c(x, y, z, trimmed_activity))
 working_df  %<>% filter(trimmed_activity != "transit")
 
 
@@ -87,25 +87,26 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
     )
   )
 
+# Removing NAs reduces the freq from 30Hz to 1Hz
+
+working_df  %<>% na.omit()
 
 ```
 
 Note that we need to exclude Participant number 112  as it is not properly classified. 
 
 # Add new features
-We use a window of one second.
+As the *counts* are calculated for each second, using a window of 5 means that we are generating the feature for 10 second period.
 
 ```{r message= T , warning=FALSE}
-frequency <- 30
-window_size_sec <- 1
+frequency <- 1
+window_size_sec <- 5
 # The number of features reduces by this
 reduction_coef <-  window_size_sec * frequency
 new_features_df <-
   GenerateFeatures(raw_df = working_df,
                    window_size_sec = window_size_sec,
-                   frequency = frequency) #%>%
-  #dplyr::select(-c("dfr_x", "dfr_y", "dfr_z")) # Eliminates outliers ,i.e. ("dfr_x", "dfr_y", "dfr_z")
-
+                   frequency = frequency)
 
 # Increase the frequency
 new_features_df <-
@@ -120,6 +121,22 @@ working_df <- bind_cols(working_df, new_features_df)
 working_df  %<>% na_interpolation(option =  "linear")
 
 ```
+# Fixing the high accuracy issue
+Since we have a dataset with 58 predictive features and 55 of these features are constant for every 30 readings, we have a leaky training set. The window is five second, and the frequency is 1Hz. Therefore every 5 readings have the same features. To fix this issue, we only use the first observation in each window. Also, the size of the dataset will be smaller, and the modelling process will be faster. 
+
+
+```{r}
+
+freq <- reduction_coef
+
+working_df  %<>% groupdata2::group(n = freq, method = "greedy") %>%
+  rename( "id" = .groups )
+
+working_df  %<>% group_by(id) %>%
+  summarise_all(first) %>% 
+  select(-id)
+
+```
 
 
 ## Apply models
@@ -132,7 +149,8 @@ results <-
         shrink = 1,
         return_plots = TRUE,
         save_results = FALSE,
-        min_node_size = 50
+        min_node_size = 5
+        
     )
 ```
 
