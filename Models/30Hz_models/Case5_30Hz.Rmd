@@ -1,7 +1,7 @@
 ---
-title: "Case 3 with 30Hz frequency - Leakage fixed"
+title: "Case 5 with 30Hz frequency"
 author: "Javad Khataei"
-date: "8/29/2019"
+date: "11/05/2019"
 output:
     html_document:
         code_folding : hide
@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE , eval = T)
 
 ## Linear imputation, X, Y, Z axis, and Features
 
-In this markdown, we use the linear imputed data. Only **X, Y, and Z-axis and Features** variables are used for this model. We can apply the following models using the `ApplyModels` function from `BEAP` package:
+In this markdown, we use the linear imputed data. Only **Features created based on the vector magnitude of raw accelerometer data** variables are used for this model. We can apply the following models using the `ApplyModels` function from `BEAP` package:
 
 - `RF`, Random Forest
 - `LDA`, Linear Discriminant Analysis
@@ -91,7 +91,7 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
 ```
 
 Note that we need to exclude Participant number 112  as it is not properly classified. 
-
+#NOTE : NEED TO MODIFY THE BEAP PACKAGE TO CALCCULATE FEATURE ONLY BASED ON VEC MAG
 # Add new features
 We use a window of one second.
 
