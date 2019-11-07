@@ -91,6 +91,17 @@ working_df$trimmed_activity  %<>% str_replace_all(" ", "_") %>%
 ```
 
 Note that we need to exclude Participant number 112  as it is not properly classified. 
+
+## Create vector magnititude
+```{r}
+norm <- function(x) sqrt(x_axis^2 + y_axis^2 + z_axis^2)
+working_df[1:100,] %>% select(c(x_axis, y_axis, z_axis)) %>% 
+  mutate(vec_mag = function(x) sqrt(x_axis^2 + y_axis^2 + z_axis^2))
+
+```
+
+
+
 #NOTE : NEED TO MODIFY THE BEAP PACKAGE TO CALCCULATE FEATURE ONLY BASED ON VEC MAG
 # Add new features
 We use a window of one second.
