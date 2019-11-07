@@ -103,32 +103,24 @@ Note that we need to exclude Participant number 112  as it is not properly class
 ```{r}
 VecMag <- function(x,y,z) sqrt((x^2 + y^2 + z^2))
 
-working_df %<>% select(c(x_axis, y_axis, z_axis)) %>% 
+working_df %<>% select(c(x_axis, y_axis, z_axis, trimmed_activity)) %>% 
     rowwise() %>% 
     mutate(vec_mag = VecMag(x_axis, y_axis, z_axis))
 
 ```
 
-## Importing feature generator function
-Modify this functin so it to make it work with one column
+## a quick fix
+To quickley fix the problem let's set x, y, amd z axis to vecmag and calculate the features. Then select feature for either x, y or z direction and also, remove the feature that depend on combination of x, y, and z.
 
-
-```{r}
-
-```
-
-
-#NOTE : NEED TO MODIFY THE BEAP PACKAGE TO CALCCULATE FEATURE ONLY BASED ON VEC MAG
-# Add new features
-We use a window of one second.
-
-## a quick fix- delete this later
 ```{r}
 working_df$x_axis <- working_df$vec_mag
 working_df$y_axis <- working_df$vec_mag
 working_df$z_axis <- working_df$vec_mag
 ```
 
+
+# Add new features
+We use a window of one second.
 
 
 ```{r message= T , warning=FALSE}
@@ -156,6 +148,38 @@ working_df <- bind_cols(working_df, new_features_df)
 working_df  %<>% na_interpolation(option =  "linear")
 
 ```
+
+## Remove redundant features
+
+```{r}
+selected_columns <- c(
+    "vec_mag",
+    "sum_x",
+    "snp_x",
+    "mean_x",
+    "sd_x",
+    "cv_x",
+    "amp_x",
+    "iqr_x",
+    "acf_x",
+    "skw_x",
+    "krt_x",
+    "sle_x",
+    "pin_x",
+    "zcr_x",
+    "dfr_x",
+    "adf_x",
+    "ent_x",
+    "ntile",
+    "trimmed_activity")  
+working_df %<>% select(selected_columns)
+selected_columns <- stringr::str_replace_all(selected_columns,pattern = "_x", replacement = "_vec_mag")
+colnames(working_df) <- selected_columns
+
+```
+
+
+
 # Fixing the high accuracy issue
 Since we have a dataset with 58 predictive features and 55 of these features are constant for every 30 readings, we have a leaky training set. The window is one second, and the frequency is 30Hz. Therefore every 30 readings have the same features. To fix this issue, we only use the first observation in each window. Also, the size of the dataset will be smaller, and the modelling process will be faster. 
 
