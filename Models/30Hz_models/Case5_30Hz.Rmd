@@ -11,7 +11,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE , eval = T)
 ```
-
+ 
 ## Linear imputation, X, Y, Z axis, and Features
 
 In this markdown, we use the linear imputed data. Only **Features created based on the vector magnitude of raw accelerometer data** variables are used for this model. We can apply the following models using the `ApplyModels` function from `BEAP` package:
