@@ -54,7 +54,14 @@ OS <- Sys.info()
 if (OS["sysname"] == "Windows") {
   main_path <-
     "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
-} else {
+} 
+if (OS["sysname"] == "Linux") {
+
+      main_path <-
+    "/media/Z/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+}
+
+if (OS["sysname"] == "macOS") {
   main_path <-
     "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
 }
@@ -94,9 +101,10 @@ Note that we need to exclude Participant number 112  as it is not properly class
 
 ## Create vector magnititude
 ```{r}
-norm <- function(x) sqrt(x_axis^2 + y_axis^2 + z_axis^2)
+norm <- function(x,y,z) sqrt((x^2 + y^2 + z^2))
 working_df[1:100,] %>% select(c(x_axis, y_axis, z_axis)) %>% 
-  mutate(vec_mag = function(x) sqrt(x_axis^2 + y_axis^2 + z_axis^2))
+    rowwise() %>% 
+    mutate(vec_mag1 = norm(x_axis, y_axis, z_axis))
 
 ```
 
