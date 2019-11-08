@@ -54,7 +54,14 @@ OS <- Sys.info()
 if (OS["sysname"] == "Windows") {
   main_path <-
     "Z:/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
-} else {
+} 
+if (OS["sysname"] == "Linux") {
+
+      main_path <-
+    "/media/Z/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
+}
+
+if (OS["sysname"] == "macOS") {
   main_path <-
     "/Volumes/hkr-storage/Research/dfuller/Walkabilly/studies/smarphone_accel/data"
 }
