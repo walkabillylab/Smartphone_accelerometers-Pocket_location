@@ -73,6 +73,10 @@ setwd(path)
 fwrite(final_data_frame,file = "Ethica_jaeger_merged_metadata_30Hz.csv")
 ```
 
+
+
+By default we don't run the following codes (eval = False)
+
 ## Repeat all for the special imputation method
 
 Read the Metadate

@@ -1,6 +1,6 @@
 ## Javad Khataei
 ## 7/16/2019
-## First Model
+
 
 #---------------------------------------------------------------#
 #This code reads labelled Ethica data.
