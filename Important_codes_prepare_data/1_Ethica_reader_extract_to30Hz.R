@@ -31,7 +31,7 @@ convert_freq <- function(df) {
   # convert character to data
   df$record_time <- df$record_time %>% as_datetime()
 
-  # change frequency to 10 hz
+ 
   ## floor or round the datetime to 1s intervals to calculate freqin each second
   df <-
     df$record_time %>%
